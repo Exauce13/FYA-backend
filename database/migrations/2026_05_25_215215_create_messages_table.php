@@ -1,0 +1,32 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('messages', function (Blueprint $table) {
+            $table->id();
+
+            $table->unsignedBigInteger('expediteur_id');
+            $table->foreign('expediteur_id')->references('id')->on('users')->onDelete('cascade');
+            $table->unsignedBigInteger('destinataire_id');
+            $table->foreign('destinataire_id')->references('id')->on('users')->onDelete('cascade');
+            $table->unsignedBigInteger('appel_offre_id')->nullable();
+            $table->foreign('appel_offre_id')->references('id')->on('appels_offres')->onDelete('set null');
+            $table->text('content')->nullable();
+            $table->string('file_url')->nullable();
+            $table->boolean('is_read')->default(false);
+            $table->timestamp('read_at')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('messages');
+    }
+};
