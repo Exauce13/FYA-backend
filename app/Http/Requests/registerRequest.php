@@ -2,10 +2,10 @@
 
 namespace App\Http\Requests;
 
-# use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 
 class registerRequest extends FormRequest
 {
@@ -43,10 +43,16 @@ class registerRequest extends FormRequest
             'statut' => ['required', 'in:clients,artisans'],
             'ville' => ['required', 'regex:/^[A-Za-zÀ-ÿ-]{2,50}$/'],
             'quartier' => ['required', 'regex:/^[A-Za-zÀ-ÿ-]{2,50}$/'],
-            'metiers' => ['required_if:statut,artisans', 'nullable', 'string','max:255','regex:/^[A-Za-zÀ-ÿ\s,\-]+$/'],
+            'metiers' => [
+                'required_if:statut,artisans',
+                'nullable',
+                'string',
+                'max:255',
+                'in:Plombier, Electricien, Menuisier, Peintre, Carreleur',
+            ],
             'bio' => ['nullable', 'max:1000', 'string', 'regex:/^[A-Za-zÀ-ÿ0-9\s,\.\'\-\!\?]+$/'],
-            'npi' => ['required_if:statut,artisans', 'nullable', 'integer'],
-            'annees_experiences' => ['required_if:statut,artisans', 'nullable', 'integer', 'min:0'],
+            'npi' => ['required_if:statut,artisans', 'nullable', 'digits_between:1,10', 'unique:artisans,npi'],
+            'annees_experiences' => ['required_if:statut,artisans', 'nullable', 'min:0'],
             'nom_association' => ['nullable', 'string', 'max:100'],
             'telephone_association' => ['nullable', 'max:10', 'regex:/^01[4569][0-9]{7}$/'],
             'diplome' => ['nullable', ],
@@ -74,10 +80,12 @@ class registerRequest extends FormRequest
             'quartier.required' => 'Le quartier est obligatoire.',
             'quartier.regex' => 'Le quartier doit contenir uniquement des lettres et des tirets.',
             'metiers.required_if' => 'Le métier est obligatoire pour un artisan.',
-            'metiers.regex' => 'Le métier doit contenir uniquement des lettres et des tirets.',
+            'metiers.in' => 'Le métier choisi est invalide.',
             #'bio.required_if' => 'La bio est obligatoire pour un artisan.',
             'bio.regex' => 'La bio doit contenir uniquement des lettres, espaces ou tirets ',
-            'npi.required_if' => 'Le NPI est obligatoire pour un artisan.',
+            'npi.digits_between' => 'Le npi ne doit pas dépasser 10 chiffres.',
+            'npi.required_if' => 'Le npi est obligatoire pour un artisan.',
+            'npi.unique'=> 'le npi est unique',
             'annees_experiences.required_if' => 'Les années d’expérience sont obligatoires pour un artisan.',
             'telephone_association.regex' => 'Veuillez entrer un numéro d’association béninois valide commençant par 01.',
 

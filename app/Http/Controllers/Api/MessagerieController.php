@@ -2,10 +2,329 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\MessageSent;
 use App\Http\Controllers\Controller;
+use App\Models\ConversationModel;
+use App\Models\MessageModel;
+use App\Models\NotificationModel;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class MessagerieController extends Controller
 {
-    //
+    public function upload(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            if (! $user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifie.',
+                ], 401);
+            }
+            $validated = $request->validate([
+                'media' => ['required', 'file', 'max:20480'],
+            ]);
+            /** @var UploadedFile $file */
+            $file = $validated['media'];
+            $path = $file->store("messages/tmp/user-{$user->id}", 'public');
+            return response()->json([
+                'success' => true,
+                'message' => 'Fichier uploadé avec succès.',
+                'data' => [
+                    'file_name' => $file->hashName(),
+                    'original_name' => $file->getClientOriginalName(),
+                    'file_path' => $path,
+                    'mime_type' => $file->getClientMimeType(),
+                    'size' => $file->getSize(),
+                    'url' => asset('storage/' . $path),
+                ],
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de validation.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur est survenue lors de l upload du fichier.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    public function store(Request $request, ConversationModel $conversation): JsonResponse
+    {
+        $storedPaths = [];
+
+        try {
+            $user = $request->user();
+
+            if (! $user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifie.',
+                ], 401);
+            }
+
+            if (! $this->userBelongsToConversation($user->id, $conversation)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous ne pouvez pas envoyer de message dans cette conversation.',
+                ], 403);
+            }
+
+            $validated = $request->validate([
+                'content' => ['nullable', 'string', 'max:5000'],
+                'media' => ['nullable'],
+            ]);
+
+            $content = trim((string) ($validated['content'] ?? ''));
+            $mediaInput = $this->normalizeMediaInput($request->input('media', $validated['media'] ?? null));
+            $mediaPayload = [];
+
+            foreach ($mediaInput as $item) {
+                $mediaPayload[] = $this->promoteMediaItem($item, $conversation->id, $storedPaths);
+            }
+
+            if ($content === '' && empty($mediaPayload)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le message doit contenir du texte ou un media.',
+                ], 422);
+            }
+
+            $otherParticipant = $conversation->otherParticipantFor($user->id);
+
+            if (! $otherParticipant) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cette conversation ne contient pas de second participant valide.',
+                ], 422);
+            }
+
+            $message = DB::transaction(function () use ($conversation, $user, $content, $mediaPayload, $otherParticipant) {
+                $message = MessageModel::create([
+                    'conversation_id' => $conversation->id,
+                    'expediteur_id' => $user->id,
+                    'destinataire_id' => $otherParticipant->id,
+                    'content' => $content !== '' ? $content : null,
+                    'media' => $mediaPayload ?: null,
+                ]);
+
+                $destinataires = collect([$conversation->userOne, $conversation->userTwo])
+                    ->filter(fn ($participant) => $participant && (int) $participant->id !== $user->id)
+                    ->values();
+
+                $notifications = $destinataires->map(function ($destinataire) use ($message, $user) {
+                    return [
+                        'user_id' => $destinataire->id,
+                        'type' => 'nouveau_message',
+                        'data_json' => json_encode([
+                            'message_id' => $message->id,
+                            'conversation_id' => $message->conversation_id,
+                            'sender_id' => $user->id,
+                            'sender_name' => $user->name,
+                            'content' => $message->content,
+                            'media' => $message->media,
+                        ]),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                })->all();
+
+                if ($notifications) {
+                    NotificationModel::insert($notifications);
+                }
+
+                return $message->load('user', 'conversation', 'destinataire');
+            });
+
+            broadcast(new MessageSent($message))->toOthers();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Message envoyé avec succès.',
+                'data' => $message,
+                'media_urls' => collect($message->media ?? [])->pluck('url')->values()->all(),
+            ], 201);
+        } catch (ValidationException $e) {
+            foreach ($storedPaths as $storedPath) {
+                Storage::disk('public')->delete($storedPath);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de validation.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Throwable $e) {
+            foreach ($storedPaths as $storedPath) {
+                Storage::disk('public')->delete($storedPath);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur est survenue lors de l envoi du message.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    public function index(Request $request, ConversationModel $conversation): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (! $user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifie.',
+                ], 401);
+            }
+
+            if (! $this->userBelongsToConversation($user->id, $conversation)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous ne pouvez pas consulter cette conversation.',
+                ], 403);
+            }
+
+            $messages = MessageModel::query()
+                ->where('conversation_id', $conversation->id)
+                ->with('user', 'conversation', 'destinataire')
+                ->orderBy('created_at')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Historique des messages recupere avec succes.',
+                'data' => $messages,
+            ]);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur est survenue lors de la recuperation des messages.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    public function conversations(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (! $user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifie.',
+                ], 401);
+            }
+
+            $conversations = ConversationModel::query()
+                ->where(function ($query) use ($user) {
+                    $query->where('user_1_id', $user->id)
+                        ->orWhere('user_2_id', $user->id);
+                })
+                ->with([
+                    'userOne',
+                    'userTwo',
+                    'messages' => function ($query) {
+                        $query->latest()->limit(1);
+                    },
+                ])
+                ->latest()
+                ->get()
+                ->map(function (ConversationModel $conversation) {
+                    $participants = collect([$conversation->userOne, $conversation->userTwo])
+                        ->filter()
+                        ->values();
+
+                    return [
+                        'id' => $conversation->id,
+                        'title' => $conversation->title,
+                        'type' => $conversation->type,
+                        'users' => $participants,
+                        'last_message' => $conversation->messages->first(),
+                        'created_at' => $conversation->created_at,
+                        'updated_at' => $conversation->updated_at,
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Conversations recuperees avec succes.',
+                'data' => $conversations,
+            ]);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur est survenue lors de la recuperation des conversations.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    private function userBelongsToConversation(int $userId, ConversationModel $conversation): bool
+    {
+        return $conversation->containsUser($userId);
+    }
+    private function normalizeMediaInput(mixed $mediaInput): array
+    {
+        if (is_string($mediaInput)) {
+            $decoded = json_decode($mediaInput, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+        if ($mediaInput instanceof UploadedFile) {
+            return [$mediaInput];
+        }
+        if (is_array($mediaInput)) {
+            return $mediaInput;
+        }
+        return [];
+    }
+    private function promoteMediaItem(mixed $item, int $conversationId, array &$storedPaths): array
+    {
+        if ($item instanceof UploadedFile) {
+            $tempPath = $item->store("messages/tmp/user-upload", 'public');
+            $storedPaths[] = $tempPath;
+            $finalPath = "messages/conversation-{$conversationId}/" . basename($tempPath);
+            Storage::disk('public')->move($tempPath, $finalPath);
+            $storedPaths[count($storedPaths) - 1] = $finalPath;
+            return [
+                'original_name' => $item->getClientOriginalName(),
+                'file_name' => $item->hashName(),
+                'file_path' => $finalPath,
+                'mime_type' => $item->getClientMimeType(),
+                'size' => $item->getSize(),
+                'url' => asset('storage/' . $finalPath),
+            ];
+        }
+        if (! is_array($item) || empty($item['file_path'])) {
+            throw ValidationException::withMessages([
+                'media' => 'Chaque media doit contenir un file_path valide.',
+            ]);
+        }
+        $tempPath = $item['file_path'];
+        if (! Storage::disk('public')->exists($tempPath)) {
+            throw ValidationException::withMessages([
+                'media' => 'Le fichier temporaire est introuvable.',
+            ]);
+        }
+        $finalPath = "messages/conversation-{$conversationId}/" . basename($tempPath);
+        Storage::disk('public')->move($tempPath, $finalPath);
+        $storedPaths[] = $finalPath;
+        return [
+            'original_name' => $item['original_name'] ?? basename($tempPath),
+            'file_name' => $item['file_name'] ?? basename($tempPath),
+            'file_path' => $finalPath,
+            'mime_type' => $item['mime_type'] ?? null,
+            'size' => $item['size'] ?? null,
+            'url' => asset('storage/' . $finalPath),
+        ];
+    }
 }

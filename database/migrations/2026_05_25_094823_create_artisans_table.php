@@ -15,10 +15,10 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('user_id');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->enum('metiers', ['Plombier', 'Électricien', 'Menusier', 'Peintre', 'Carreleur']);
+            $table->enum('metiers', ['Plombier', 'Electricien', 'Menuisier', 'Peintre', 'Carreleur']);
             $table->string('bio');
-            $table->unsignedInteger('npi');
-            $table->unsignedInteger('annees_experiences');
+            $table->string('npi');
+            $table->string('annees_experiences');
             $table->string('nom_association')->nullable();
             $table->string('telephone_association')->nullable();
             $table->string('diplome')->nullable();

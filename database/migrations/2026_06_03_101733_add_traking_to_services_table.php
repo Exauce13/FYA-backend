@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
         Schema::table('services', function (Blueprint $table) {
@@ -13,9 +16,13 @@ return new class extends Migration
             $table->timestamp('client_valide_at')->nullable()->after('client_lu_at');
             $table->timestamp('artisan_termine_at')->nullable()->after('client_valide_at');
             $table->timestamp('client_termine_at')->nullable()->after('artisan_termine_at');
+
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::table('services', function (Blueprint $table) {
@@ -28,3 +35,4 @@ return new class extends Migration
         });
     }
 };
+

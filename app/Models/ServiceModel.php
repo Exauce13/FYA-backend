@@ -54,4 +54,9 @@ class ServiceModel extends Model
     {
         return $this->belongsTo(AppelOffreModel::class, 'appeloffer_id');
     }
+
+    public function avis()
+    {
+        return $this->hasMany(AvisModel::class, 'service_id');
+    }
 }

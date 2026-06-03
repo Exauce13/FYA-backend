@@ -21,4 +21,14 @@ class ClientModel extends Model
     {
         return $this->hasMany(ServiceModel::class, 'client_id');
     }
+
+    public function avisEcrits()
+    {
+        return $this->hasMany(AvisModel::class, 'auteur_id', 'user_id');
+    }
+
+    public function avisRecus()
+    {
+        return $this->hasMany(AvisModel::class, 'cible_id', 'user_id');
+    }
 }

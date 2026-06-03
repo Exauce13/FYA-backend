@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Http\JsonResponse;
 use App\Models\AppelOffreModel;
+use App\Models\AvisModel;
 use App\Models\ArtisanModel;
 use App\Models\ClientModel;
 use App\Models\User;
@@ -159,6 +160,49 @@ class UserController extends Controller
             'message' => 'Déconnexion réussie'
             ]);
     }
+    public function profil(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (! $user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifie.',
+                ], 401);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Profil recupere avec succes.',
+                'user' => $this->formatProfileWithAvis($user),
+            ]);
+        }
+        catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la recuperation du profil.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    public function profilUtilisateur(User $user): JsonResponse
+    {
+        try {
+            return response()->json([
+                'success' => true,
+                'message' => 'Profil recupere avec succes.',
+                'user' => $this->formatProfileWithAvis($user),
+            ]);
+        }
+        catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la recuperation du profil.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
     public function changementprofile(PhotoUpdateRequest $request): JsonResponse
     {
         try {
@@ -191,6 +235,21 @@ class UserController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+    private function formatProfileWithAvis(User $user): User
+    {
+        $user->load('artisan', 'client');
+
+        $avisQuery = AvisModel::query()->where('cible_id', $user->id);
+        $totalAvis = (clone $avisQuery)->count();
+        $moyenneNote = (clone $avisQuery)->avg('note');
+
+        $user->setAttribute('avis_stats', [
+            'total_avis' => $totalAvis,
+            'moyenne_note' => $moyenneNote !== null ? round((float) $moyenneNote, 2) : null,
+        ]);
+
+        return $user;
     }
     public function updateinfos(User $user, UpdateInfoRequest $request){
         try{

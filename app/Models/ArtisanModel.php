@@ -34,4 +34,14 @@ class ArtisanModel extends Model
     public function services(){
         return $this->hasMany(ServiceModel::class, 'artisan_id');
     }
+
+    public function avisEcrits()
+    {
+        return $this->hasMany(AvisModel::class, 'auteur_id', 'user_id');
+    }
+
+    public function avisRecus()
+    {
+        return $this->hasMany(AvisModel::class, 'cible_id', 'user_id');
+    }
 }

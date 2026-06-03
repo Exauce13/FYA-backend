@@ -36,11 +36,11 @@ class UpdateInfoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'password' =>['required','regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_\-#])[A-Za-z\d@$!%*?&_\-#]{8,12}$/'],
-            'telephone' => ['required', 'max:10', 'unique:users,telephone',  'regex:/^01[4569][0-9]{7}$/'],
-            'ville' => ['required', 'regex:/^[A-Za-zÀ-ÿ-]{2,50}$/'],
-            'quartier' => ['required', 'regex:/^[A-Za-zÀ-ÿ-]{2,50}$/'],
-            'annees_experiences' => ['required_if:statut,artisans', 'nullable', 'integer', 'min:0'],
+            'password' =>['sometimes','regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_\-#])[A-Za-z\d@$!%*?&_\-#]{8,12}$/'],
+            'telephone' => ['sometimes', 'max:10', 'unique:users,telephone',  'regex:/^01[4569][0-9]{7}$/'],
+            'ville' => ['sometimes', 'regex:/^[A-Za-zÀ-ÿ-]{2,50}$/'],
+            'quartier' => ['sometimes', 'regex:/^[A-Za-zÀ-ÿ-]{2,50}$/'],
+            'annees_experiences' => ['sometimes_if:statut,artisans', 'nullable', 'integer', 'min:0'],
             'nom_association' => ['nullable', 'string', 'max:100'],
             'telephone_association' => ['nullable', 'max:10', 'regex:/^01[4569][0-9]{7}$/'],
             'diplome' => ['sometimes','file','mimes:pdf','max:5120'],
