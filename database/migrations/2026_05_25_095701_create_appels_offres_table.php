@@ -15,8 +15,11 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('user_id');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->string('titre');
             $table->string('description');
-            $table->string('metiers_cibles');
+            $table->unsignedBigInteger('metier_id')->nullable();
+            $table->string('ville');
+            $table->unsignedBigInteger('budget')->nullable();
             $table->json('appel_json')->nullable();
             $table->enum('status', ['open', 'closed'])->default('open');
             $table->timestamps();

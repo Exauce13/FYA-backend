@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('description');
             $table->decimal('montant', 10, 2);
             $table->string('duree_service');
-            $table->enum('statut', ['en_attente', 'valider', 'en_cours', 'terminer'])->default('en_attente');
+            $table->enum('statut', ['en_attente','en_cours', 'terminer'])->default('en_attente');
             $table->string('devis')->nullable();
             $table->timestamps();
         });

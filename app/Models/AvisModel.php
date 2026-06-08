@@ -9,7 +9,6 @@ class AvisModel extends Model
     protected $table = 'avis';
 
     protected $fillable = [
-        'service_id',
         'auteur_id',
         'cible_id',
         'commentaire',
@@ -21,11 +20,6 @@ class AvisModel extends Model
         return [
             'note' => 'integer',
         ];
-    }
-
-    public function service()
-    {
-        return $this->belongsTo(ServiceModel::class, 'service_id');
     }
 
     public function auteur()

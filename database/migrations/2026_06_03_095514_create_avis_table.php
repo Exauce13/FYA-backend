@@ -13,14 +13,13 @@ return new class extends Migration
     {
         Schema::create('avis', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('service_id')->constrained('services')->cascadeOnDelete();
             $table->foreignId('auteur_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('cible_id')->constrained('users')->cascadeOnDelete();
             $table->unsignedTinyInteger('note');
             $table->text('commentaire')->nullable();
             $table->timestamps();
 
-            $table->unique(['service_id', 'auteur_id']);
+            $table->unique(['auteur_id', 'cible_id']);
             $table->index(['cible_id', 'note']);
         });
     }

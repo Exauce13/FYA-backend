@@ -5,7 +5,6 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Validation\Rule;
 
 class registerRequest extends FormRequest
 {
@@ -27,6 +26,15 @@ class registerRequest extends FormRequest
         ]));
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->route('statut')) {
+            $this->merge([
+                'statut' => $this->route('statut'),
+            ]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -35,24 +43,32 @@ class registerRequest extends FormRequest
      */
     public function rules(): array
     {
+        $isArtisan = $this->input('statut') === 'artisans';
+
         return [
             'name' => ['required','max:12', 'regex:/^[A-Za-zÀ-ÿ\-]+$/'],
             'email' => ['required','email', 'unique:users,email'],
             'password' =>['required','regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_\-#])[A-Za-z\d@$!%*?&_\-#]{8,12}$/'],
             'telephone' => ['required', 'max:10', 'unique:users,telephone',  'regex:/^01[4569][0-9]{7}$/'],
             'statut' => ['required', 'in:clients,artisans'],
-            'ville' => ['required', 'regex:/^[A-Za-zÀ-ÿ-]{2,50}$/'],
-            'quartier' => ['required', 'regex:/^[A-Za-zÀ-ÿ-]{2,50}$/'],
-            'metiers' => [
-                'required_if:statut,artisans',
+            'ville' => ['required_if:statut,artisans', 'nullable', 'regex:/^[A-Za-zÀ-ÿ-]{2,50}$/'],
+            'quartier' => ['required_if:statut,artisans', 'nullable', 'regex:/^[A-Za-zÀ-ÿ-]{2,50}$/'],
+            'metier_id' => [
+                'nullable',
+                'integer',
+                'exists:metiers,id',
+                $isArtisan ? 'required_without:metier_nom' : 'nullable',
+            ],
+            'metier_nom' => [
                 'nullable',
                 'string',
                 'max:255',
-                'in:Plombier, Electricien, Menuisier, Peintre, Carreleur',
+                'exists:metiers,nom',
+                $isArtisan ? 'required_without:metier_id' : 'nullable',
             ],
             'bio' => ['nullable', 'max:1000', 'string', 'regex:/^[A-Za-zÀ-ÿ0-9\s,\.\'\-\!\?]+$/'],
             'npi' => ['required_if:statut,artisans', 'nullable', 'digits_between:1,10', 'unique:artisans,npi'],
-            'annees_experiences' => ['required_if:statut,artisans', 'nullable', 'min:0'],
+            'annees_experiences' => ['required_if:statut,artisans', 'nullable', 'integer', 'min:0'],
             'nom_association' => ['nullable', 'string', 'max:100'],
             'telephone_association' => ['nullable', 'max:10', 'regex:/^01[4569][0-9]{7}$/'],
             'diplome' => ['nullable', ],
@@ -79,8 +95,13 @@ class registerRequest extends FormRequest
             'ville.regex' => 'La ville doit contenir uniquement des lettres et des tirets.',
             'quartier.required' => 'Le quartier est obligatoire.',
             'quartier.regex' => 'Le quartier doit contenir uniquement des lettres et des tirets.',
-            'metiers.required_if' => 'Le métier est obligatoire pour un artisan.',
-            'metiers.in' => 'Le métier choisi est invalide.',
+            'metier_id.required_if' => 'Le métier est obligatoire pour un artisan.',
+            'metier_id.required_without' => 'Le métier est obligatoire.',
+            'metier_id.integer' => 'Le métier choisi est invalide.',
+            'metier_id.exists' => 'Le métier choisi est invalide.',
+            'metier_nom.required_without' => 'Le métier est obligatoire.',
+            'metier_nom.string' => 'Le métier choisi est invalide.',
+            'metier_nom.exists' => 'Le métier choisi est invalide.',
             #'bio.required_if' => 'La bio est obligatoire pour un artisan.',
             'bio.regex' => 'La bio doit contenir uniquement des lettres, espaces ou tirets ',
             'npi.digits_between' => 'Le npi ne doit pas dépasser 10 chiffres.',

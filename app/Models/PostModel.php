@@ -21,4 +21,9 @@ class PostModel extends Model
     public function commentaires(){
         return $this->hasMany(CommentaireModel::class, 'post_id');
     }
+
+    public function likes()
+    {
+        return $this->hasMany(LikeModel::class, 'post_id');
+    }
 }

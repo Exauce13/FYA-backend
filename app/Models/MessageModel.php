@@ -13,6 +13,7 @@ class MessageModel extends Model
         'expediteur_id',
         'destinataire_id',
         'appel_offre_id',
+        'kind',
         'content',
         'media',
         'is_read',

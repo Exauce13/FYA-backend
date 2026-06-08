@@ -51,6 +51,14 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasMany(AvisModel::class, 'cible_id');
     }
+    public function plaintesDeposees()
+    {
+        return $this->hasMany(Plainte::class, 'plaignant_id');
+    }
+    public function plaintesRecues()
+    {
+        return $this->hasMany(Plainte::class, 'mise_en_cause_id');
+    }
     public function conversations(): Builder
     {
         return ConversationModel::query()

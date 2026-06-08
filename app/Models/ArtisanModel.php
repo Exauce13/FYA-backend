@@ -10,28 +10,41 @@ class ArtisanModel extends Model
 
     protected $fillable = [
         'user_id',
-        'metiers',
+        'metier_id',
         'bio',
+        'nom_atelier',
         'npi',
         'annees_experiences',
+        'piece_identites',
         'nom_association',
         'telephone_association',
         'diplome',
         'is_certifed',
         'is_boost',
     ];
-    public function user(){
+
+    public function user()
+    {
         return $this->belongsTo(User::class, 'user_id');
     }
-    public function post(){
+
+    public function metier()
+    {
+        return $this->belongsTo(MetierModel::class, 'metier_id');
+    }
+
+    public function post()
+    {
         return $this->hasMany(PostModel::class, 'artisan_id');
     }
 
-    public function candidatures(){
+    public function candidatures()
+    {
         return $this->hasMany(CandidatureModel::class, 'artisan_id');
     }
 
-    public function services(){
+    public function services()
+    {
         return $this->hasMany(ServiceModel::class, 'artisan_id');
     }
 

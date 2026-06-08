@@ -18,8 +18,8 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->enum('statut', ['clients', 'artisans', 'admin']);
-            $table->string('ville');
-            $table->string('quartier');
+            $table->string('ville')->nullable();
+            $table->string('quartier')->nullable();
             $table->string('telephone');
             $table->string('photo')->nullable();
             $table->rememberToken();

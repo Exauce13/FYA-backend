@@ -7,6 +7,7 @@ use App\Http\Requests\registerRequest;
 use App\Http\Requests\AuthenticateRequest;
 use App\Http\Requests\PhotoUpdateRequest;
 use App\Http\Requests\UpdateInfoRequest;
+use App\Http\Requests\UpdatePasswordRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Session;
@@ -15,11 +16,13 @@ use App\Models\AppelOffreModel;
 use App\Models\AvisModel;
 use App\Models\ArtisanModel;
 use App\Models\ClientModel;
+use App\Models\MetierModel;
 use App\Models\User;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Exception;
 
 class UserController extends Controller
@@ -29,21 +32,29 @@ class UserController extends Controller
         try {
             $user = DB::transaction(function () use ($request) {
                 $validated = $request->validated();
+                $metierId = $validated['metier_id'] ?? MetierModel::query()
+                    ->where('nom', $validated['metier_nom'] ?? null)
+                    ->value('id');
+
+                if (($validated['statut'] ?? null) === 'artisans' && ! $metierId) {
+                    throw new Exception('Le métier choisi est invalide.');
+                }
+
                 $user = User::create([
                     'name' => $validated['name'],
                     'email' => $validated['email'],
                     'password' => $validated['password'],
                     'statut' => $validated['statut'],
-                    'ville' => $validated['ville'],
-                    'quartier' => $validated['quartier'],
                     'telephone' => $validated['telephone'],
+                    'ville' => $validated['ville'] ?? null,
+                    'quartier' => $validated['quartier'] ?? null,
                     'photo' => $validated['photo'] ?? null,
                 ]);
                 if ($validated['statut'] === 'artisans') {
                     ArtisanModel::create([
                         'user_id' => $user->id,
-                        'metiers' => $validated['metiers'],
-                        'bio' => $validated['bio'],
+                        'metier_id' => $metierId,
+                        'bio' => $validated['bio']  ?? null,
                         'npi' => $validated['npi'],
                         'annees_experiences' => $validated['annees_experiences'],
                         'nom_association' => $validated['nom_association'] ?? null,
@@ -97,7 +108,6 @@ class UserController extends Controller
             'message' => 'Adresse email verifiee avec succes.',
         ]);
     }
-
     public function resendVerificationEmail(Request $request)
     {
         $validated = $request->validate([
@@ -160,49 +170,6 @@ class UserController extends Controller
             'message' => 'Déconnexion réussie'
             ]);
     }
-    public function profil(Request $request): JsonResponse
-    {
-        try {
-            $user = $request->user();
-
-            if (! $user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Utilisateur non authentifie.',
-                ], 401);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Profil recupere avec succes.',
-                'user' => $this->formatProfileWithAvis($user),
-            ]);
-        }
-        catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur lors de la recuperation du profil.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-    public function profilUtilisateur(User $user): JsonResponse
-    {
-        try {
-            return response()->json([
-                'success' => true,
-                'message' => 'Profil recupere avec succes.',
-                'user' => $this->formatProfileWithAvis($user),
-            ]);
-        }
-        catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur lors de la recuperation du profil.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
     public function changementprofile(PhotoUpdateRequest $request): JsonResponse
     {
         try {
@@ -236,41 +203,38 @@ class UserController extends Controller
             ], 500);
         }
     }
-    private function formatProfileWithAvis(User $user): User
-    {
-        $user->load('artisan', 'client');
-
-        $avisQuery = AvisModel::query()->where('cible_id', $user->id);
-        $totalAvis = (clone $avisQuery)->count();
-        $moyenneNote = (clone $avisQuery)->avg('note');
-
-        $user->setAttribute('avis_stats', [
-            'total_avis' => $totalAvis,
-            'moyenne_note' => $moyenneNote !== null ? round((float) $moyenneNote, 2) : null,
-        ]);
-
-        return $user;
-    }
     public function updateinfos(User $user, UpdateInfoRequest $request){
         try{
             $validated = $request->validated();
-            User::update([
-                'password' => $validated['password'],
-                'telephone' => $validated['telephone'],
-                'ville' => $validated['ville'],
-                'quartier' => $validated['quartier'],
+
+            $user->fill([
+                'telephone' => $validated['telephone'] ?? $user->telephone,
+                'ville' => $validated['ville'] ?? $user->ville,
+                'quartier' => $validated['quartier'] ?? $user->quartier,
             ]);
-            if($user->artisan){
-                ArtisanModel::update([
-                    'annees_experiences' => $validated['annees_experiences'],
-                    'diplome' => $validated['diplome'],
-                ]);
+            $user->save();
+
+            if ($user->artisan) {
+                $artisanData = [
+                    'bio' => array_key_exists('bio', $validated) ? $validated['bio'] : $user->artisan->bio,
+                    'nom_atelier' => array_key_exists('nom_atelier', $validated) ? $validated['nom_atelier'] : $user->artisan->nom_atelier,
+                    'annees_experiences' => array_key_exists('annees_experiences', $validated) ? $validated['annees_experiences'] : $user->artisan->annees_experiences,
+                ];
+
+                if ($request->hasFile('diplome')) {
+                    $artisanData['diplome'] = $request->file('diplome')->store('diplomes', 'public');
+                } elseif (array_key_exists('diplome', $validated)) {
+                    $artisanData['diplome'] = $validated['diplome'];
+                }
+
+                $user->artisan->update($artisanData);
             }
+
             return response()->json([
                 'success' => true,
-                'message' => 'Modification effectuee avec succes. Veuillez verifier votre adresse email.',
+                'message' => 'Modification effectuee avec succes.',
                 'user' => $user,
-            ],201);
+            ], 200);
         }
         catch(Exception $e){
             return response()->json([
@@ -280,18 +244,123 @@ class UserController extends Controller
             ],500);
         }
     }
+    public function updatemdp(UpdatePasswordRequest $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (! $user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifie.',
+                ], 401);
+            }
+
+            $validated = $request->validated();
+
+            if (! Hash::check($validated['old_password'], $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'L ancien mot de passe est incorrect.',
+                ], 422);
+            }
+
+            if (
+                array_key_exists('new_password_confirmation', $validated)
+                && $validated['new_password_confirmation'] !== null
+                && $validated['new_password_confirmation'] !== $validated['new_password']
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La confirmation du nouveau mot de passe ne correspond pas.',
+                ], 422);
+            }
+
+            $user->password = $validated['new_password'];
+            $user->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Mot de passe modifie avec succes.',
+            ], 200);
+        }
+        catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la modification du mot de passe.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
     public function rechercheArtisan(Request $request): JsonResponse
     {
         try {
-            $validated = $request->validate([
-                'ville' => ['required', 'string', 'max:50'],
-                'quartier' => ['required', 'string', 'max:50'],
-                'metiers' => ['required', 'string', 'max:255'],
+            $validator = Validator::make($request->all(), [
+                'ville' => ['nullable', 'string', 'max:50'],
+                'quartier' => ['nullable', 'string', 'max:50'],
+                'metier_id' => ['required', 'integer', 'exists:metiers,id'],
+                'certifie' => ['sometimes', 'boolean'],
             ]);
-            $artisans = ArtisanModel::with('user')->where('metiers', 'like', '%' . $validated['metiers'] . '%')->whereHas('user', function ($query) use ($validated) {
-                    $query->where('ville', 'like', '%' . $validated['ville'] . '%')->where('quartier', 'like', '%' . $validated['quartier'] . '%');
-                })->get();
+
+            if ($validator->fails()) {
                 return response()->json([
+                    'success' => false,
+                    'message' => 'Erreur de validation.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $validated = $validator->validated();
+
+            $artisans = ArtisanModel::with('user', 'metier')
+                ->where('metier_id', (int) $validated['metier_id'])
+                ->when(! empty($validated['ville'] ?? null), function ($query) use ($validated) {
+                    $query->whereHas('user', function ($userQuery) use ($validated) {
+                        $userQuery->where('ville', 'like', '%' . $validated['ville'] . '%');
+                    });
+                })
+                ->when(! empty($validated['quartier'] ?? null), function ($query) use ($validated) {
+                    $query->whereHas('user', function ($userQuery) use ($validated) {
+                        $userQuery->where('quartier', 'like', '%' . $validated['quartier'] . '%');
+                    });
+                })
+                ->when($request->boolean('certifie'), function ($query) {
+                    $query->where('is_certifed', true);
+                })
+                ->get()
+                ->map(function (ArtisanModel $artisan) {
+                    return [
+                        'id' => $artisan->id,
+                        'name' => $artisan->user?->name,
+                        'ville' => $artisan->user?->ville,
+                        'quartier' => $artisan->user?->quartier,
+                        'telephone' => $artisan->user?->telephone,
+                        'photo' => $artisan->user?->photo,
+                        'metier_id' => $artisan->metier_id,
+                        'metier' => $artisan->metier ? [
+                            'id' => $artisan->metier->id,
+                            'nom' => $artisan->metier->nom,
+                        ] : null,
+                        'bio' => $artisan->bio,
+                        'npi' => $artisan->npi,
+                        'annees_experiences' => $artisan->annees_experiences,
+                        'nom_association' => $artisan->nom_association,
+                        'telephone_association' => $artisan->telephone_association,
+                        'diplome' => $artisan->diplome,
+                        'is_certifed' => $artisan->is_certifed,
+                        'is_boost' => $artisan->is_boost,
+                    ];
+                });
+
+            if ($request->boolean('certifie') && $artisans->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Aucun artisan certifie ne correspond a ces criteres.',
+                    'artisans' => [],
+                ], 404);
+            }
+
+            return response()->json([
                 'success' => true,
                 'message' => 'Recherche effectuee avec succes.',
                 'artisans' => $artisans,

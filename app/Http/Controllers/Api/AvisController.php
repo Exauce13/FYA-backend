@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\ArtisanModel;
 use App\Models\AvisModel;
 use App\Models\ClientModel;
-use App\Models\ServiceModel;
+use App\Models\User;
+use App\Http\Requests\StoreAvisRequest;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class AvisController extends Controller
 {
@@ -33,33 +35,53 @@ class AvisController extends Controller
             'Avis du client recuperes avec succes.'
         );
     }
-    public function serviceAvis(Request $request, ServiceModel $service): JsonResponse
+    public function store(StoreAvisRequest $request, User $user): JsonResponse
     {
-        $user = $request->user();
-        if (! $user) {
+        try {
+            $auteur = $request->user();
+            if (! $auteur) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifie.',
+                ], 401);
+            }
+            if ((int) $auteur->id === (int) $user->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous ne pouvez pas laisser un avis sur votre propre profil.',
+                ], 422);
+            }
+            $validated = $request->validated();
+            $commentaire = trim((string) ($validated['commentaire'] ?? ''));
+            $avis = AvisModel::updateOrCreate(
+                [
+                    'auteur_id' => $auteur->id,
+                    'cible_id' => $user->id,
+                ],
+                [
+                    'note' => $validated['note'],
+                    'commentaire' => $commentaire !== '' ? $commentaire : null,
+                ]
+            );
+            return response()->json([
+                'success' => true,
+                'message' => $avis->wasRecentlyCreated
+                    ? 'Avis enregistre avec succes.'
+                    : 'Avis mis a jour avec succes.',
+                'avis' => $avis->load('auteur', 'cible'),
+            ], $avis->wasRecentlyCreated ? 201 : 200);
+        }
+        catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Utilisateur non authentifie.',
-            ], 401);
+                'message' => 'Erreur de validation.',
+                'errors' => $e->errors(),
+            ], 422);
         }
-        $service->loadMissing('client.user', 'artisan.user');
-        if (! $this->userPeutAccederAuService($user, $service)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Vous ne pouvez pas consulter les avis de ce service.',
-            ], 403);
-        }
-        return $this->buildAvisResponse(
-            AvisModel::query()->where('service_id', $service->id),
-            [
-                'service' => $service->load('client.user', 'artisan.user'),
-            ],
-            'Avis du service recuperes avec succes.'
-        );
     }
     private function buildAvisResponse(Builder $query, array $context, string $message): JsonResponse
     {
-        $avis = $query->with(['auteur', 'cible', 'service.client.user', 'service.artisan.user'])->latest()->get();
+        $avis = $query->with(['auteur', 'cible'])->latest()->get();
         $stats = [
             'total_avis' => $avis->count(),
             'moyenne_note' => $avis->avg('note') !== null ? round((float) $avis->avg('note'), 2) : null,
@@ -73,12 +95,5 @@ class AvisController extends Controller
                 'stats' => $stats,
             ],
         ]);
-    }
-    private function userPeutAccederAuService($user, ServiceModel $service): bool
-    {
-        if ($user->artisan && $service->artisan_id === $user->artisan->id) {
-            return true;
-        }
-        return $user->client && $service->client_id === $user->client->id;
     }
 }

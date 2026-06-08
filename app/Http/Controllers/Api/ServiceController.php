@@ -3,12 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\AvisModel;
 use App\Models\ClientModel;
 use App\Models\MessageModel;
 use App\Models\ServiceModel;
 use App\Models\User;
-use App\Http\Requests\StoreAvisRequest;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -231,84 +229,6 @@ class ServiceController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la finalisation du service.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-    public function avis(StoreAvisRequest $request, ServiceModel $service): JsonResponse
-    {
-        try {
-            $user = $request->user();
-            if (! $user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Utilisateur non authentifie.',
-                ], 401);
-            }
-            $service->loadMissing('client.user', 'artisan.user');
-
-            if (! $this->userPeutAccederAuService($user, $service)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Vous ne pouvez pas laisser un avis sur ce service.',
-                ], 403);
-            }
-            if ($service->statut !== 'terminer') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Un avis ne peut etre laisse qu apres la fin du service.',
-                ], 409);
-            }
-            $validated = $request->validated();
-            $clientUserId = $service->client?->user_id;
-            $artisanUserId = $service->artisan?->user_id;
-            if (! $clientUserId || ! $artisanUserId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Ce service ne contient pas les participants attendus.',
-                ], 422);
-            }
-            if ((int) $user->id === (int) $clientUserId) {
-                $cibleId = $artisanUserId;
-            } elseif ((int) $user->id === (int) $artisanUserId) {
-                $cibleId = $clientUserId;
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Vous ne faites pas partie des participants de ce service.',
-                ], 403);
-            }
-            $commentaire = trim((string) ($validated['commentaire'] ?? ''));
-            $avis = AvisModel::updateOrCreate(
-                [
-                    'service_id' => $service->id,
-                    'auteur_id' => $user->id,
-                ],
-                [
-                    'cible_id' => $cibleId,
-                    'note' => $validated['note'],
-                    'commentaire' => $commentaire !== '' ? $commentaire : null,
-                ]
-            );
-            return response()->json([
-                'success' => true,
-                'message' => $avis->wasRecentlyCreated
-                    ? 'Avis enregistre avec succes.'
-                    : 'Avis mis a jour avec succes.',
-                'avis' => $avis->load('service.client.user', 'service.artisan.user', 'auteur', 'cible'),
-            ], $avis->wasRecentlyCreated ? 201 : 200);
-        }
-        catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur de validation.',
-                'errors' => $e->errors(),
-            ], 422);
-        }
-        catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur lors de l enregistrement de l avis.',
                 'error' => $e->getMessage(),
             ], 500);
         }

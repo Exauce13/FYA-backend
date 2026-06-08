@@ -4,15 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\NotificationModel;
 use App\Http\Requests\AppelOffresRequest;
 use Illuminate\Http\JsonResponse;
 use App\Models\AppelOffreModel;
 use App\Models\ArtisanModel;
 use App\Models\CandidatureModel;
+use App\Models\MetierModel;
+use App\Services\NotificationService;
 use Exception;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AppeloffreController extends Controller
@@ -31,34 +31,53 @@ class AppeloffreController extends Controller
                 ], 401);
             }
             $validated = $appelrequest->validated();
-            foreach ($appelrequest->file('appel_json', []) as $mediappel) {
+            $metierId = $validated['metier_id'] ?? MetierModel::query()
+                ->where('nom', $validated['metier_nom'] ?? null)
+                ->value('id');
+
+            if (! $metierId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le métier ciblé est invalide.',
+                ], 422);
+            }
+            $appelFiles = $appelrequest->file('appel_json', $appelrequest->file('media_json', []));
+
+            foreach ($appelFiles as $mediappel) {
                 $appelPaths[] = $mediappel->store('appeloffres', 'public');
             }
-            [$appelOffre, $notificationsCount] = DB::transaction(function () use ($user, $validated, $appelPaths) {
+            [$appelOffre, $notificationsCount] = DB::transaction(function () use ($user, $validated, $appelPaths, $metierId) {
                 $appelOffre = AppelOffreModel::create([
                     'user_id' => $user->id,
+                    'titre' => $validated['titre'],
                     'description' => $validated['description'],
                     'appel_json' => $appelPaths ?: null,
-                    'metiers_cibles' => $validated['metiers_cibles'],
+                    'metier_id' => $metierId,
+                    'ville' => $validated['ville'],
+                    'budget' => $validated['budget'] ?? null,
                     'status' => 'open',
                 ]);
 
-                $artisans = ArtisanModel::query()->where('metiers', 'like', '%' . $validated['metiers_cibles'] . '%')->pluck('user_id');
+                $artisans = ArtisanModel::query()
+                    ->where('metier_id', $metierId)
+                    ->pluck('user_id');
                 $notifications = $artisans->map(fn ($userId) => [
                     'user_id' => $userId,
                     'type' => 'nouvel_appel_offre',
-                    'data_json' => json_encode([
+                    'data_json' => [
                         'appel_offre_id' => $appelOffre->id,
                         'client_id' => $user->id,
-                        'metiers_cibles' => $appelOffre->metiers_cibles,
+                        'titre' => $appelOffre->titre,
+                        'metier_id' => $appelOffre->metier_id,
+                        'metier_nom' => $validated['metier_nom'] ?? null,
+                        'ville' => $appelOffre->ville,
+                        'budget' => $appelOffre->budget,
                         'description' => $appelOffre->description,
-                    ]),
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    ],
                 ])->all();
 
                 if ($notifications) {
-                    NotificationModel::insert($notifications);
+                    app(NotificationService::class)->sendMany($notifications);
                 }
 
                 return [$appelOffre, count($notifications)];
@@ -67,7 +86,7 @@ class AppeloffreController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Appel d\'offre crée avec succès.',
-                'appel_offre' => $appelOffre,
+                'appel_offre' => $appelOffre->load('metier', 'user'),
                 'notifications_envoyees' => $notificationsCount,
             ], 201);
         }
@@ -130,19 +149,17 @@ class AppeloffreController extends Controller
                     'message' => 'Seul un artisan peut voir les appels d offres.',
                 ], 403);
             }
-            $metiers = collect(explode(',', $artisan->metiers))->map(fn ($metier) => trim($metier))->filter();
-            if ($metiers->isEmpty()) {
+            $metier = $artisan->metier;
+            if (! $metier) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Aucun metier defini pour cet artisan.',
-                ], 404);
+                    ], 404);
             }
-            $appelsOffres = AppelOffreModel::with('user')->where('status', 'open')
-                ->where(function ($query) use ($metiers) {
-                    foreach ($metiers as $metier) {
-                        $query->orWhere('metiers_cibles', 'like', '%' . $metier . '%');
-                    }
-                })->latest()->paginate(20);
+            $appelsOffres = AppelOffreModel::with('user', 'metier')->where('status', 'open')
+                ->where('metier_id', $metier->id)
+                ->latest()
+                ->paginate(20);
             if ($appelsOffres->isEmpty())
             {
                 return response()->json([
@@ -189,7 +206,7 @@ class AppeloffreController extends Controller
                     'message' => 'Cet appel d offre est deja cloture.',
                 ], 403);
             }
-            if (! $this->artisanPeutPostuler($artisan->metiers, $appelOffre->metiers_cibles)) {
+            if ((int) $artisan->metier_id !== (int) $appelOffre->metier_id) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Votre metier ne correspond pas au metier cible de cet appel d offre.',
@@ -245,7 +262,7 @@ class AppeloffreController extends Controller
                     'message' => 'Utilisateur non authentifie.',
                 ], 401);
             }
-            $candidature->load('appelOffre', 'artisan.user');
+            $candidature->load('appelOffre.metier', 'artisan.user');
             if ($candidature->appelOffre->user_id !== $user->id) {
                 return response()->json([
                     'success' => false,
@@ -279,32 +296,34 @@ class AppeloffreController extends Controller
                 $notifications = [[
                     'user_id' => $candidature->artisan->user_id,
                     'type' => 'candidature_acceptee',
-                    'data_json' => json_encode([
+                    'data_json' => [
                         'candidature_id' => $candidature->id,
                         'appel_offre_id' => $candidature->appelOffre->id,
-                        'metiers_cibles' => $candidature->appelOffre->metiers_cibles,
+                        'titre' => $candidature->appelOffre->titre,
+                        'metier_id' => $candidature->appelOffre->metier_id,
+                        'ville' => $candidature->appelOffre->ville,
+                        'budget' => $candidature->appelOffre->budget,
                         'description' => $candidature->appelOffre->description,
-                    ]),
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    ],
                 ]];
 
                 foreach ($autresCandidatures as $autreCandidature) {
                     $notifications[] = [
                         'user_id' => $autreCandidature->artisan->user_id,
                         'type' => 'candidature_refusee',
-                        'data_json' => json_encode([
+                        'data_json' => [
                             'candidature_id' => $autreCandidature->id,
                             'appel_offre_id' => $candidature->appelOffre->id,
-                            'metiers_cibles' => $candidature->appelOffre->metiers_cibles,
+                            'titre' => $candidature->appelOffre->titre,
+                            'metier_id' => $candidature->appelOffre->metier_id,
+                            'ville' => $candidature->appelOffre->ville,
+                            'budget' => $candidature->appelOffre->budget,
                             'description' => $candidature->appelOffre->description,
-                        ]),
-                        'created_at' => now(),
-                        'updated_at' => now(),
+                        ],
                     ];
                 }
 
-                NotificationModel::insert($notifications);
+                app(NotificationService::class)->sendMany($notifications);
 
                 return count($notifications);
             });
@@ -312,7 +331,7 @@ class AppeloffreController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Candidature acceptee avec succes.',
-                'candidature' => $candidature->refresh()->load('artisan.user', 'appelOffre'),
+                'candidature' => $candidature->refresh()->load('artisan.user', 'appelOffre.metier'),
                 'notifications_envoyees' => $notificationsCount,
             ]);
         }
@@ -325,12 +344,4 @@ class AppeloffreController extends Controller
         }
     }
 
-    private function artisanPeutPostuler(?string $metiersArtisan, string $metierCible): bool
-    {
-        $metiers = collect(explode(',', (string) $metiersArtisan))->map(fn ($metier) => Str::lower(trim($metier)))->filter();
-
-        $metierCible = Str::lower(trim($metierCible));
-
-        return $metiers->contains(fn ($metier) => $metier === $metierCible);
-    }
 }

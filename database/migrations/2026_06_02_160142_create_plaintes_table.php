@@ -13,7 +13,15 @@ return new class extends Migration
     {
         Schema::create('plaintes', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('plaignant_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('mise_en_cause_id')->constrained('users')->cascadeOnDelete();
+            $table->string('motif');
+            $table->text('description')->nullable();
+            $table->enum('statut_plainte', ['en_attente', 'geree'])->default('en_attente');
             $table->timestamps();
+
+            $table->index(['plaignant_id', 'mise_en_cause_id']);
+            $table->index('statut_plainte');
         });
     }
 

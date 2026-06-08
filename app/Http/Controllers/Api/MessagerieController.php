@@ -6,7 +6,7 @@ use App\Events\MessageSent;
 use App\Http\Controllers\Controller;
 use App\Models\ConversationModel;
 use App\Models\MessageModel;
-use App\Models\NotificationModel;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -37,6 +37,7 @@ class MessagerieController extends Controller
                 'success' => true,
                 'message' => 'Fichier uploadé avec succès.',
                 'data' => [
+                    'kind' => $this->guessMediaKind($file->getClientMimeType()),
                     'file_name' => $file->hashName(),
                     'original_name' => $file->getClientOriginalName(),
                     'file_path' => $path,
@@ -55,6 +56,60 @@ class MessagerieController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Une erreur est survenue lors de l upload du fichier.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    public function uploadVoiceNote(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            if (! $user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifie.',
+                ], 401);
+            }
+
+            $validated = $request->validate([
+                'voice_note' => ['required', 'file', 'max:20480'],
+            ]);
+
+            /** @var UploadedFile $file */
+            $file = $validated['voice_note'];
+
+            if (! $this->isAudioMimeType($file->getClientMimeType())) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le fichier doit etre un fichier audio valide.',
+                ], 422);
+            }
+
+            $path = $file->store("messages/tmp/user-{$user->id}", 'public');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Note vocale uploadée avec succès.',
+                'data' => [
+                    'kind' => 'voice_note',
+                    'file_name' => $file->hashName(),
+                    'original_name' => $file->getClientOriginalName(),
+                    'file_path' => $path,
+                    'mime_type' => $file->getClientMimeType(),
+                    'size' => $file->getSize(),
+                    'url' => asset('storage/' . $path),
+                ],
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de validation.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur est survenue lors de l upload de la note vocale.',
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -83,14 +138,20 @@ class MessagerieController extends Controller
             $validated = $request->validate([
                 'content' => ['nullable', 'string', 'max:5000'],
                 'media' => ['nullable'],
+                'voice_note' => ['nullable'],
             ]);
 
             $content = trim((string) ($validated['content'] ?? ''));
             $mediaInput = $this->normalizeMediaInput($request->input('media', $validated['media'] ?? null));
+            $voiceNoteInput = $this->normalizeMediaInput($request->input('voice_note', $validated['voice_note'] ?? null));
             $mediaPayload = [];
 
             foreach ($mediaInput as $item) {
                 $mediaPayload[] = $this->promoteMediaItem($item, $conversation->id, $storedPaths);
+            }
+
+            foreach ($voiceNoteInput as $item) {
+                $mediaPayload[] = $this->promoteMediaItem($item, $conversation->id, $storedPaths, 'voice_note');
             }
 
             if ($content === '' && empty($mediaPayload)) {
@@ -109,11 +170,14 @@ class MessagerieController extends Controller
                 ], 422);
             }
 
-            $message = DB::transaction(function () use ($conversation, $user, $content, $mediaPayload, $otherParticipant) {
+            $messageKind = $this->guessMessageKind($content, $mediaPayload);
+
+            $message = DB::transaction(function () use ($conversation, $user, $content, $mediaPayload, $otherParticipant, $messageKind) {
                 $message = MessageModel::create([
                     'conversation_id' => $conversation->id,
                     'expediteur_id' => $user->id,
                     'destinataire_id' => $otherParticipant->id,
+                    'kind' => $messageKind,
                     'content' => $content !== '' ? $content : null,
                     'media' => $mediaPayload ?: null,
                 ]);
@@ -126,21 +190,20 @@ class MessagerieController extends Controller
                     return [
                         'user_id' => $destinataire->id,
                         'type' => 'nouveau_message',
-                        'data_json' => json_encode([
+                        'data_json' => [
                             'message_id' => $message->id,
                             'conversation_id' => $message->conversation_id,
                             'sender_id' => $user->id,
                             'sender_name' => $user->name,
+                            'kind' => $message->kind,
                             'content' => $message->content,
                             'media' => $message->media,
-                        ]),
-                        'created_at' => now(),
-                        'updated_at' => now(),
+                        ],
                     ];
                 })->all();
 
                 if ($notifications) {
-                    NotificationModel::insert($notifications);
+                    app(NotificationService::class)->sendMany($notifications);
                 }
 
                 return $message->load('user', 'conversation', 'destinataire');
@@ -195,11 +258,7 @@ class MessagerieController extends Controller
                 ], 403);
             }
 
-            $messages = MessageModel::query()
-                ->where('conversation_id', $conversation->id)
-                ->with('user', 'conversation', 'destinataire')
-                ->orderBy('created_at')
-                ->get();
+            $messages = MessageModel::query()->where('conversation_id', $conversation->id)->with('user', 'conversation', 'destinataire')->orderBy('created_at')->get();
 
             return response()->json([
                 'success' => true,
@@ -226,10 +285,8 @@ class MessagerieController extends Controller
                 ], 401);
             }
 
-            $conversations = ConversationModel::query()
-                ->where(function ($query) use ($user) {
-                    $query->where('user_1_id', $user->id)
-                        ->orWhere('user_2_id', $user->id);
+            $conversations = ConversationModel::query()->where(function ($query) use ($user) {
+                    $query->where('user_1_id', $user->id)->orWhere('user_2_id', $user->id);
                 })
                 ->with([
                     'userOne',
@@ -287,15 +344,22 @@ class MessagerieController extends Controller
         }
         return [];
     }
-    private function promoteMediaItem(mixed $item, int $conversationId, array &$storedPaths): array
+    private function promoteMediaItem(mixed $item, int $conversationId, array &$storedPaths, ?string $forcedKind = null): array
     {
         if ($item instanceof UploadedFile) {
+            if ($forcedKind === 'voice_note' && ! $this->isAudioMimeType($item->getClientMimeType())) {
+                throw ValidationException::withMessages([
+                    'voice_note' => 'La note vocale doit etre un fichier audio valide.',
+                ]);
+            }
+
             $tempPath = $item->store("messages/tmp/user-upload", 'public');
             $storedPaths[] = $tempPath;
             $finalPath = "messages/conversation-{$conversationId}/" . basename($tempPath);
             Storage::disk('public')->move($tempPath, $finalPath);
             $storedPaths[count($storedPaths) - 1] = $finalPath;
             return [
+                'kind' => $forcedKind ?? $this->guessMediaKind($item->getClientMimeType()),
                 'original_name' => $item->getClientOriginalName(),
                 'file_name' => $item->hashName(),
                 'file_path' => $finalPath,
@@ -319,6 +383,7 @@ class MessagerieController extends Controller
         Storage::disk('public')->move($tempPath, $finalPath);
         $storedPaths[] = $finalPath;
         return [
+            'kind' => $forcedKind ?? $this->guessMediaKind($item['mime_type'] ?? null),
             'original_name' => $item['original_name'] ?? basename($tempPath),
             'file_name' => $item['file_name'] ?? basename($tempPath),
             'file_path' => $finalPath,
@@ -326,5 +391,54 @@ class MessagerieController extends Controller
             'size' => $item['size'] ?? null,
             'url' => asset('storage/' . $finalPath),
         ];
+    }
+    private function guessMessageKind(string $content, array $mediaPayload): string
+    {
+        if ($content !== '' && ! empty($mediaPayload)) {
+            return 'mixed';
+        }
+
+        if (collect($mediaPayload)->contains(fn (array $item) => ($item['kind'] ?? null) === 'voice_note')) {
+            return 'voice_note';
+        }
+
+        if (! empty($mediaPayload)) {
+            return 'media';
+        }
+
+        return 'text';
+    }
+    private function guessMediaKind(?string $mimeType): string
+    {
+        if ($this->isAudioMimeType($mimeType)) {
+            return 'voice_note';
+        }
+
+        if (is_string($mimeType) && str_starts_with($mimeType, 'image/')) {
+            return 'image';
+        }
+
+        if (is_string($mimeType) && str_starts_with($mimeType, 'video/')) {
+            return 'video';
+        }
+
+        return 'attachment';
+    }
+    private function isAudioMimeType(?string $mimeType): bool
+    {
+        if (! is_string($mimeType) || $mimeType === '') {
+            return false;
+        }
+
+        return in_array($mimeType, [
+            'audio/aac',
+            'audio/mpeg',
+            'audio/mp4',
+            'audio/ogg',
+            'audio/wav',
+            'audio/webm',
+            'audio/x-m4a',
+            'video/webm',
+        ], true);
     }
 }
