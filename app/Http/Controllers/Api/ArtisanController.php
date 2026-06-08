@@ -241,6 +241,8 @@ class ArtisanController extends Controller
                 'media_json' => $mediaPaths ?: null,
                 'post_type' => $validated['post_type'],
             ]);
+            $post->loadCount('likes');
+
             return response()->json([
                 'success' => true,
                 'message' => 'Post cree avec succes.',
@@ -262,7 +264,7 @@ class ArtisanController extends Controller
     public function feedPosts(): JsonResponse
     {
         try {
-            $posts = PostModel::with('artisanP.user')->latest()->paginate(20);
+            $posts = PostModel::with('artisanP.user')->withCount('likes')->latest()->paginate(20);
 
             if ($posts->isEmpty()) {
                 return response()->json([

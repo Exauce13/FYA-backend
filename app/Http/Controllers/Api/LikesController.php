@@ -22,16 +22,18 @@ class LikesController extends Controller
                     'message' => 'Utilisateur non authentifie.',
                 ], 401);
             }
-            PostModel::findOrFail($postid);
+            $post = PostModel::findOrFail($postid);
             $like = LikeModel::where('user_id', $user->id)->where('post_id', $postid)->first();
             if($like)
             {
                 $like->delete();
+                $post->loadCount('likes');
 
                 return response()->json([
                     'success' => true,
                     'message' => 'Like retiré avec succès.',
                     'liked' => false,
+                    'likes_count' => $post->likes_count,
                 ]);
             }
             else{
@@ -40,10 +42,13 @@ class LikesController extends Controller
                     'post_id' => $postid,
                 ]);
             }
+            $post->loadCount('likes');
+
             return response()->json([
                 'success' => true,
                 'message' => 'Post aimé avec succès.',
                 'liked' => true,
+                'likes_count' => $post->likes_count,
                 'like' => $like,
             ]);
         }
