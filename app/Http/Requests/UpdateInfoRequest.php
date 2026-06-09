@@ -41,7 +41,7 @@ class UpdateInfoRequest extends FormRequest
             'quartier' => ['sometimes', 'regex:/^[A-Za-zÀ-ÿ-]{2,50}$/'],
             'bio' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'nom_atelier' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'annees_experiences' => ['sometimes_if:statut,artisans', 'nullable', 'integer', 'min:0'],
+            'annees_experiences' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'nom_association' => ['nullable', 'string', 'max:100'],
             'telephone_association' => ['nullable', 'max:10', 'regex:/^01[4569][0-9]{7}$/'],
             'diplome' => ['sometimes','file','mimes:pdf','max:5120'],

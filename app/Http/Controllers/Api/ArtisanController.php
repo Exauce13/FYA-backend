@@ -243,8 +243,8 @@ class ArtisanController extends Controller
                 'media_json' => $mediaPaths ?: null,
                 'post_type' => $validated['post_type'],
             ]);
-            $post->likes->count();
-            $post->commentaires->count();
+            $post->load(['artisanP.user']);
+            $post->loadCount(['likes', 'commentaires']);
 
             return response()->json([
                 'success' => true,
@@ -489,7 +489,7 @@ class ArtisanController extends Controller
 
     private function fedapayBaseUrl(): string
     {
-        return config('services.fedapay.environment') === 'live'
+        return config('services.fedapay.environment') === 'sandbox'
             ? 'https://api.fedapay.com/v1'
             : 'https://sandbox-api.fedapay.com/v1';
     }

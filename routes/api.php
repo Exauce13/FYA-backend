@@ -59,6 +59,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/closeappel/{id}', [AppeloffreController::class, 'closeappeloffre']);
         #à tester avec un artisan
         Route::patch('/candidatures/{candidature}/accepter', [AppeloffreController::class, 'accepterCandidature']);
+        Route::get('/mes-appels-offres', [AppeloffreController::class, 'mesAppelsOffres']);
         Route::get('/feed-appels-offres', [AppeloffreController::class, 'feedAppelsOffres']);
         #à tester avec un artisan
         Route::post('/appels-offres/{appelOffre}/postuler', [AppeloffreController::class, 'postulerAppelOffre']);

@@ -28,7 +28,11 @@ class NotificationService
             $createdNotifications[] = $notification;
 
             DB::afterCommit(static function () use ($notification): void {
-                event(new RealtimeNotificationSent($notification->fresh()));
+                try {
+                    event(new RealtimeNotificationSent($notification->fresh()));
+                } catch (\Throwable $e) {
+                    report($e);
+                }
             });
         }
 

@@ -150,7 +150,7 @@ class UserController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Connexion effectuee avec succes.',
-                'user' => $user,
+                'user' => $user->load(['artisan.metier', 'client']),
                 'token' => $token,
                 'token_type' => 'Bearer',
             ]);

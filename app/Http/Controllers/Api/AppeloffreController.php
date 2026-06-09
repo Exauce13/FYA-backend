@@ -13,6 +13,7 @@ use App\Models\MetierModel;
 use App\Services\NotificationService;
 use Exception;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class AppeloffreController extends Controller
@@ -131,6 +132,39 @@ class AppeloffreController extends Controller
             ], 500);
         }
     }
+
+    public function mesAppelsOffres(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            if (! $user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifie.',
+                ], 401);
+            }
+
+            $appelsOffres = AppelOffreModel::query()
+                ->where('user_id', $user->id)
+                ->with(['user', 'metier', 'candidatures.artisan.user'])
+                ->withCount('candidatures')
+                ->latest()
+                ->paginate(20);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Mes appels d offres recuperes avec succes.',
+                'data' => $appelsOffres,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur est survenue.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function feedAppelsOffres(Request $request): JsonResponse
     {
         try
@@ -156,7 +190,9 @@ class AppeloffreController extends Controller
                     'message' => 'Aucun metier defini pour cet artisan.',
                     ], 404);
             }
-            $appelsOffres = AppelOffreModel::with('user', 'metier')->where('status', 'open')
+            $appelsOffres = AppelOffreModel::with('user', 'metier')
+                ->withCount('candidatures')
+                ->where('status', 'open')
                 ->where('metier_id', $metier->id)
                 ->latest()
                 ->paginate(20);
@@ -185,6 +221,8 @@ class AppeloffreController extends Controller
 
     public function postulerAppelOffre(Request $request, AppelOffreModel $appelOffre): JsonResponse
     {
+        $devisPath = null;
+
         try {
             $user = $request->user();
             if (! $user) {
@@ -214,7 +252,7 @@ class AppeloffreController extends Controller
             }
             $validated = $request->validate([
                 'description' => ['required', 'string', 'min:10', 'max:1000'],
-                'devis_propose' => ['nullable', 'string', 'max:255'],
+                'devis_propose' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
             ]);
             $candidatureExiste = CandidatureModel::query()->where('appeloffer_id', $appelOffre->id)->where('artisan_id', $artisan->id)->exists();
             if ($candidatureExiste) {
@@ -223,17 +261,23 @@ class AppeloffreController extends Controller
                     'message' => 'Vous avez deja postule a cet appel d offre.',
                 ], 409);
             }
+
+            if ($request->hasFile('devis_propose')) {
+                $devisPath = $request->file('devis_propose')->store('devis', 'public');
+            }
+
             $candidature = CandidatureModel::create([
                 'appeloffer_id' => $appelOffre->id,
                 'artisan_id' => $artisan->id,
                 'description' => $validated['description'],
-                'devis_propose' => $validated['devis_propose'] ?? null,
+                'devis_propose' => $devisPath,
                 'statut' => 'en_attente',
             ]);
             return response()->json([
                 'success' => true,
                 'message' => 'Candidature envoyee avec succes.',
                 'candidature' => $candidature->load('artisan.user', 'appelOffre'),
+                'devis_url' => $devisPath ? Storage::url($devisPath) : null,
             ], 201);
         }
         catch (ValidationException $e) {
@@ -244,6 +288,10 @@ class AppeloffreController extends Controller
             ], 422);
         }
         catch (Exception $e) {
+            if ($devisPath) {
+                Storage::disk('public')->delete($devisPath);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de l envoi de la candidature.',

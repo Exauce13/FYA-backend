@@ -28,6 +28,12 @@ class registerRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        if ($this->filled('name')) {
+            $this->merge([
+                'name' => preg_replace('/\s+/', ' ', trim((string) $this->input('name'))),
+            ]);
+        }
+
         if ($this->route('statut')) {
             $this->merge([
                 'statut' => $this->route('statut'),
