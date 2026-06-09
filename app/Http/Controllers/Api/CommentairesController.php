@@ -15,11 +15,13 @@ class CommentairesController extends Controller
     {
         try {
             $commentaires = $post->commentaires()->with('user')->latest()->get();
+            $post->loadCount('commentaires');
 
             return response()->json([
                 'success' => true,
                 'message' => 'Commentaires recuperes avec succes.',
                 'commentaires' => $commentaires,
+                'commentaires_count' => $post->commentaires_count,
             ]);
         }
         catch (Exception $e) {
@@ -49,16 +51,19 @@ class CommentairesController extends Controller
             'content' => ['nullable', 'string', 'max:255', 'required_without:comments'],
         ]);
         try {
+            $post = PostModel::findOrFail($validated['post_id']);
             $commentaire = CommentaireModel::create([
                 'comments' => $validated['comments'] ?? $validated['content'],
                 'user_id' => $user->id,
                 'post_id' => $validated['post_id'],
             ]);
+            $post->loadCount('commentaires');
 
             return response()->json([
                 'success' => true,
                 'message' => 'Commentaire poste avec succes.',
                 'commentaire' => $commentaire->load('user'),
+                'commentaires_count' => $post->commentaires_count,
             ], 201);
         }
         catch (Exception $e) {

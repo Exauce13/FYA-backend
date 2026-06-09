@@ -20,7 +20,7 @@ return new class extends Migration
             $table->enum('statut', ['clients', 'artisans', 'admin']);
             $table->string('ville')->nullable();
             $table->string('quartier')->nullable();
-            $table->string('telephone');
+            $table->string('telephone')->unique();
             $table->string('photo')->nullable();
             $table->rememberToken();
             $table->timestamps();

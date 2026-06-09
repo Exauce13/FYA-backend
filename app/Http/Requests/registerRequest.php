@@ -46,7 +46,7 @@ class registerRequest extends FormRequest
         $isArtisan = $this->input('statut') === 'artisans';
 
         return [
-            'name' => ['required','max:12', 'regex:/^[A-Za-zÀ-ÿ\-]+$/'],
+            'name' => ['required','max:100', "regex:/^[A-Za-zÀ-ÿ]+(?:[ '\-][A-Za-zÀ-ÿ]+)*$/"],
             'email' => ['required','email', 'unique:users,email'],
             'password' =>['required','regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_\-#])[A-Za-z\d@$!%*?&_\-#]{8,12}$/'],
             'telephone' => ['required', 'max:10', 'unique:users,telephone',  'regex:/^01[4569][0-9]{7}$/'],
@@ -78,7 +78,7 @@ class registerRequest extends FormRequest
     {
         return [
             'name.required' => 'Le nom est obligatoire.',
-            'name.max' => 'Le nom ne doit pas dépasser 12 caractères.',
+            'name.max' => 'Le nom ne doit pas dépasser 100 caractères.',
             'name.regex' => 'Le nom doit contenir uniquement des lettres, espaces ou tirets.',
             'email.required' => 'L\'adresse email est obligatoire.',
             'email.email' => 'Veuillez entrer une adresse email valide.',

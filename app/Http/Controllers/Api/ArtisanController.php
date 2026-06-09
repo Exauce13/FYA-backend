@@ -12,11 +12,13 @@ use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class ArtisanController extends Controller
 {
@@ -241,7 +243,8 @@ class ArtisanController extends Controller
                 'media_json' => $mediaPaths ?: null,
                 'post_type' => $validated['post_type'],
             ]);
-            $post->loadCount('likes');
+            $post->likes->count();
+            $post->commentaires->count();
 
             return response()->json([
                 'success' => true,
@@ -261,10 +264,21 @@ class ArtisanController extends Controller
             ], 500);
         }
     }
-    public function feedPosts(): JsonResponse
+    public function feedPosts(Request $request): JsonResponse
     {
         try {
-            $posts = PostModel::with('artisanP.user')->withCount('likes')->latest()->paginate(20);
+            $currentUser = $this->resolveRequestUser($request);
+
+            $posts = PostModel::query()
+                ->with('artisanP.user')
+                ->withCount(['commentaires', 'likes'])
+                ->when($currentUser, function (Builder $query, $user): void {
+                    $query->withCount([
+                        'likes as liked_by_current_user' => fn (Builder $likeQuery) => $likeQuery->where('user_id', $user->id),
+                    ]);
+                })
+                ->latest()
+                ->paginate(20);
 
             if ($posts->isEmpty()) {
                 return response()->json([
@@ -273,10 +287,12 @@ class ArtisanController extends Controller
                 ], 404);
             }
 
+            $postsArray = $this->postsPaginatorToArray($posts);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Publications recuperees avec succes.',
-                'data' => $posts,
+                'data' => $postsArray,
             ], 200);
         }
         catch (\Throwable $e) {
@@ -291,6 +307,8 @@ class ArtisanController extends Controller
     public function artisanPosts(Request $request, ArtisanModel $artisan): JsonResponse
     {
         try {
+            $currentUser = $this->resolveRequestUser($request);
+
             $posts = PostModel::query()
                 ->where('artisan_id', $artisan->id)
                 ->with([
@@ -299,6 +317,11 @@ class ArtisanController extends Controller
                     'likes',
                 ])
                 ->withCount(['commentaires', 'likes'])
+                ->when($currentUser, function (Builder $query, $user): void {
+                    $query->withCount([
+                        'likes as liked_by_current_user' => fn (Builder $likeQuery) => $likeQuery->where('user_id', $user->id),
+                    ]);
+                })
                 ->orderByDesc('created_at')
                 ->paginate(20);
 
@@ -402,20 +425,9 @@ class ArtisanController extends Controller
         ]);
     }
 
-    private function buildPostsResponse($posts, array $context, string $message): JsonResponse
+    private function buildPostsResponse(LengthAwarePaginator $posts, array $context, string $message): JsonResponse
     {
-        $postsArray = $posts->toArray();
-        $postsArray['data'] = collect($postsArray['data'] ?? [])
-            ->map(function (array $post) {
-                $post['media_urls'] = collect($post['media_json'] ?? [])
-                    ->map(fn ($path) => Storage::url($path))
-                    ->values()
-                    ->all();
-
-                return $post;
-            })
-            ->values()
-            ->all();
+        $postsArray = $this->postsPaginatorToArray($posts);
 
         return response()->json([
             'success' => true,
@@ -425,6 +437,40 @@ class ArtisanController extends Controller
                 'posts' => $postsArray,
             ],
         ]);
+    }
+
+    private function postsPaginatorToArray(LengthAwarePaginator $posts): array
+    {
+        $postsArray = $posts->toArray();
+        $postsArray['data'] = collect($postsArray['data'] ?? [])
+            ->map(function (array $post) {
+                $post['media_urls'] = collect($post['media_json'] ?? [])
+                    ->map(fn ($path) => Storage::url($path))
+                    ->values()
+                    ->all();
+
+                $post['liked_by_current_user'] = (bool) ($post['liked_by_current_user'] ?? false);
+
+                return $post;
+            })
+            ->values()
+            ->all();
+
+        return $postsArray;
+    }
+
+    private function resolveRequestUser(Request $request)
+    {
+        if ($request->user()) {
+            return $request->user();
+        }
+
+        $token = $request->bearerToken();
+        if (! $token) {
+            return null;
+        }
+
+        return PersonalAccessToken::findToken($token)?->tokenable;
     }
 
     private function isImagePath(string $path): bool

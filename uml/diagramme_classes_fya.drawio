@@ -1,0 +1,135 @@
+<mxfile host="app.diagrams.net" modified="2026-06-09T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="domaine-fya" name="Classes domaine">
+    <mxGraphModel dx="2200" dy="1500" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Diagramme de classes - Domaine FYA" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=24;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="650" y="20" width="600" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="user" value="User&#xa;------------------------------&#xa;+ id : int&#xa;+ name : string&#xa;+ email : string&#xa;+ statut : enum&#xa;+ telephone : string&#xa;+ ville : string&#xa;+ quartier : string&#xa;+ photo : string&#xa;------------------------------&#xa;+ artisan()&#xa;+ client()&#xa;+ appeloffres()&#xa;+ commentaire()&#xa;+ avisEcrits()&#xa;+ avisRecus()&#xa;+ plaintesDeposees()&#xa;+ plaintesRecues()&#xa;+ conversations() : Builder&#xa;# casts() : array" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="780" y="90" width="310" height="340" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="client" value="ClientModel&#xa;------------------------------&#xa;+ id : int&#xa;+ user_id : int&#xa;------------------------------&#xa;+ user()&#xa;+ services()&#xa;+ avisEcrits()&#xa;+ avisRecus()" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#d5e8d4;strokeColor=#82b366;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="420" y="500" width="260" height="180" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="artisan" value="ArtisanModel&#xa;------------------------------&#xa;+ id : int&#xa;+ user_id : int&#xa;+ metier_id : int&#xa;+ bio : string&#xa;+ nom_atelier : string&#xa;+ npi : string&#xa;+ annees_experiences : string&#xa;+ is_certifed : boolean&#xa;+ is_boost : boolean&#xa;------------------------------&#xa;+ user()&#xa;+ metier()&#xa;+ post()&#xa;+ candidatures()&#xa;+ services()&#xa;+ avisEcrits()&#xa;+ avisRecus()" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#d5e8d4;strokeColor=#82b366;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="470" width="320" height="360" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="metier" value="MetierModel&#xa;------------------------------&#xa;+ id : int&#xa;+ nom : string&#xa;------------------------------&#xa;+ artisans()" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#fff2cc;strokeColor=#d6b656;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="1560" y="510" width="250" height="140" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="appel" value="AppelOffreModel&#xa;------------------------------&#xa;+ id : int&#xa;+ user_id : int&#xa;+ metier_id : int&#xa;+ titre : string&#xa;+ description : string&#xa;+ ville : string&#xa;+ budget : int&#xa;+ appel_json : json&#xa;+ status : enum&#xa;------------------------------&#xa;+ user()&#xa;+ metier()&#xa;+ candidatures()&#xa;# casts() : array" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#fff2cc;strokeColor=#d6b656;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="80" y="780" width="310" height="300" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="candidature" value="CandidatureModel&#xa;------------------------------&#xa;+ id : int&#xa;+ appeloffer_id : int&#xa;+ artisan_id : int&#xa;+ description : string&#xa;+ devis_propose : string&#xa;+ statut : enum&#xa;------------------------------&#xa;+ appelOffre()&#xa;+ artisan()" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#f8cecc;strokeColor=#b85450;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="450" y="820" width="300" height="230" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="service" value="ServiceModel&#xa;------------------------------&#xa;+ id : int&#xa;+ client_id : int&#xa;+ artisan_id : int&#xa;+ message_id : int&#xa;+ appeloffer_id : int&#xa;+ titre : string&#xa;+ description : string&#xa;+ montant : decimal&#xa;+ duree_service : string&#xa;+ statut : enum&#xa;+ devis : string&#xa;+ client_lu_at : datetime&#xa;+ client_valide_at : datetime&#xa;+ artisan_termine_at : datetime&#xa;+ client_termine_at : datetime&#xa;------------------------------&#xa;+ client()&#xa;+ artisan()&#xa;+ message()&#xa;+ appelOffre()&#xa;# casts() : array" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#f5f5f5;strokeColor=#666666;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="820" y="780" width="340" height="420" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="payment" value="PaymentModel&#xa;------------------------------&#xa;+ id : int&#xa;+ artisan_id : int&#xa;+ fedapay_transaction_id : string&#xa;+ local_reference : string&#xa;+ type_evenement : string&#xa;+ montant : decimal&#xa;+ type : enum&#xa;+ statut : enum&#xa;+ paid_at : datetime&#xa;+ payment_url : text&#xa;+ certification_payload : json&#xa;------------------------------&#xa;+ artisan()&#xa;# casts() : array" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#f5f5f5;strokeColor=#666666;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="1230" y="910" width="350" height="320" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="post" value="PostModel&#xa;------------------------------&#xa;+ id : int&#xa;+ artisan_id : int&#xa;+ description : string&#xa;+ media_json : json&#xa;+ post_type : enum&#xa;------------------------------&#xa;+ artisanP()&#xa;+ commentaires()&#xa;+ likes()&#xa;# casts() : array" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="1230" y="1260" width="300" height="230" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="commentaire" value="CommentaireModel&#xa;------------------------------&#xa;+ id : int&#xa;+ post_id : int&#xa;+ user_id : int&#xa;+ comments : string&#xa;------------------------------&#xa;+ post()&#xa;+ user()" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="880" y="1280" width="290" height="180" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="like" value="LikeModel&#xa;------------------------------&#xa;+ id : int&#xa;+ user_id : int&#xa;+ post_id : int" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#e1d5e7;strokeColor=#9673a6;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="1580" y="1300" width="230" height="100" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="conversation" value="ConversationModel&#xa;------------------------------&#xa;+ id : int&#xa;+ title : string&#xa;+ type : enum&#xa;+ user_1_id : int&#xa;+ user_2_id : int&#xa;------------------------------&#xa;+ messages()&#xa;+ userOne()&#xa;+ userTwo()&#xa;+ participants()&#xa;+ containsUser(userId) : bool&#xa;+ otherParticipantFor(userId) : User" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="80" y="1140" width="330" height="290" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="message" value="MessageModel&#xa;------------------------------&#xa;+ id : int&#xa;+ conversation_id : int&#xa;+ expediteur_id : int&#xa;+ destinataire_id : int&#xa;+ appel_offre_id : int&#xa;+ kind : string&#xa;+ content : text&#xa;+ media : json&#xa;+ is_read : boolean&#xa;+ read_at : datetime&#xa;------------------------------&#xa;+ user()&#xa;+ expediteur()&#xa;+ destinataire()&#xa;+ appelOffre()&#xa;+ conversation()&#xa;# casts() : array" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="470" y="1160" width="330" height="340" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="avis" value="AvisModel&#xa;------------------------------&#xa;+ id : int&#xa;+ auteur_id : int&#xa;+ cible_id : int&#xa;+ note : int&#xa;+ commentaire : text&#xa;------------------------------&#xa;+ auteur()&#xa;+ cible()&#xa;# casts() : array" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#ffe6cc;strokeColor=#d79b00;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="90" width="290" height="210" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="plainte" value="Plainte&#xa;------------------------------&#xa;+ id : int&#xa;+ plaignant_id : int&#xa;+ mise_en_cause_id : int&#xa;+ motif : string&#xa;+ description : text&#xa;+ statut_plainte : enum&#xa;------------------------------&#xa;+ plaignant()&#xa;+ miseEnCause()&#xa;# casts() : array" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#ffe6cc;strokeColor=#d79b00;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="90" width="310" height="230" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="notification" value="NotificationModel&#xa;------------------------------&#xa;+ id : int&#xa;+ user_id : int&#xa;+ type : string&#xa;+ data_json : json&#xa;+ read_at : datetime&#xa;------------------------------&#xa;+ user()&#xa;# casts() : array" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="420" y="110" width="290" height="200" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="legend" value="Legende&#xa;------------------------------&#xa;Trait plein : association Eloquent / FK&#xa;Trait pointille : plusieurs roles vers la meme classe&#xa;0..* : zero ou plusieurs objets&#xa;0..1 : optionnel" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#ffffff;strokeColor=#999999;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="80" y="90" width="270" height="150" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_user_client" value="1 / 0..1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#2f5597;" edge="1" parent="1" source="user" target="client"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_user_artisan" value="1 / 0..1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#2f5597;" edge="1" parent="1" source="user" target="artisan"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_user_notification" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#2f5597;" edge="1" parent="1" source="user" target="notification"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_user_avis" value="auteur/cible" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;dashed=1;strokeColor=#d79b00;" edge="1" parent="1" source="user" target="avis"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_user_plainte" value="plaignant/mise en cause" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;dashed=1;strokeColor=#d79b00;" edge="1" parent="1" source="user" target="plainte"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_metier_artisan" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#d6b656;" edge="1" parent="1" source="metier" target="artisan"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_metier_appel" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#d6b656;" edge="1" parent="1" source="metier" target="appel"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_user_appel" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#2f5597;" edge="1" parent="1" source="user" target="appel"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_appel_candidature" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#b85450;" edge="1" parent="1" source="appel" target="candidature"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_artisan_candidature" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#b85450;" edge="1" parent="1" source="artisan" target="candidature"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_client_service" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#666666;" edge="1" parent="1" source="client" target="service"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_artisan_service" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#666666;" edge="1" parent="1" source="artisan" target="service"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_appel_service" value="0..1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#666666;" edge="1" parent="1" source="appel" target="service"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_artisan_payment" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#666666;" edge="1" parent="1" source="artisan" target="payment"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_artisan_post" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#9673a6;" edge="1" parent="1" source="artisan" target="post"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_post_commentaire" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#9673a6;" edge="1" parent="1" source="post" target="commentaire"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_post_like" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#9673a6;" edge="1" parent="1" source="post" target="like"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_user_commentaire" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#9673a6;" edge="1" parent="1" source="user" target="commentaire"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_user_like" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#9673a6;" edge="1" parent="1" source="user" target="like"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_conversation_message" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#2f5597;" edge="1" parent="1" source="conversation" target="message"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_message_service" value="1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#666666;" edge="1" parent="1" source="message" target="service"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_user_conversation" value="user_1/user_2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;dashed=1;strokeColor=#2f5597;" edge="1" parent="1" source="user" target="conversation"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_user_message" value="expediteur/destinataire" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;dashed=1;strokeColor=#2f5597;" edge="1" parent="1" source="user" target="message"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e_appel_message" value="0..1 / 0..*" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;strokeColor=#2f5597;" edge="1" parent="1" source="appel" target="message"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="controleurs-fya" name="Controleurs API">
+    <mxGraphModel dx="1800" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="c0"/>
+        <mxCell id="c1" parent="c0"/>
+        <mxCell id="ctitle" value="Controleurs API - Methodes implementees" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=24;fontStyle=1" vertex="1" parent="c1">
+          <mxGeometry x="450" y="30" width="700" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="userController" value="UserController&#xa;------------------------------&#xa;+ register(request)&#xa;+ verifyEmail(request, id, hash)&#xa;+ resendVerificationEmail(request)&#xa;+ authenticate(request) : JsonResponse&#xa;+ logout(request)&#xa;+ changementprofile(request) : JsonResponse&#xa;+ updateinfos(user, request)&#xa;+ updatemdp(request) : JsonResponse&#xa;+ rechercheArtisan(request) : JsonResponse" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=0;" vertex="1" parent="c1">
+          <mxGeometry x="70" y="120" width="360" height="260" as="geometry"/>
+        </mxCell>
+        <mxCell id="artisanController" value="ArtisanController&#xa;------------------------------&#xa;+ demandecertification(request) : JsonResponse&#xa;+ fedapayCertificationCallback(request, reference) : JsonResponse&#xa;+ createposte(request) : JsonResponse&#xa;+ feedPosts(request) : JsonResponse&#xa;+ artisanPosts(request, artisan) : JsonResponse&#xa;+ artisanAvis(request, artisan) : JsonResponse&#xa;+ artisanRealisations(request, artisan) : JsonResponse&#xa;- buildAvisResponse(query, context, message) : JsonResponse&#xa;- buildPostsResponse(posts, context, message) : JsonResponse&#xa;- postsPaginatorToArray(posts) : array&#xa;- resolveRequestUser(request)&#xa;- isImagePath(path) : bool&#xa;- fedapayRequest()&#xa;- fedapayBaseUrl() : string&#xa;- mapFedapayStatus(status) : string" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#d5e8d4;strokeColor=#82b366;rounded=0;" vertex="1" parent="c1">
+          <mxGeometry x="490" y="120" width="470" height="390" as="geometry"/>
+        </mxCell>
+        <mxCell id="appelController" value="AppeloffreController&#xa;------------------------------&#xa;+ createappeloffre(request) : JsonResponse&#xa;+ closeappeloffre(id, request)&#xa;+ feedAppelsOffres(request) : JsonResponse&#xa;+ postulerAppelOffre(request, appelOffre) : JsonResponse&#xa;+ accepterCandidature(request, candidature) : JsonResponse" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#fff2cc;strokeColor=#d6b656;rounded=0;" vertex="1" parent="c1">
+          <mxGeometry x="1030" y="120" width="420" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="messagerieController" value="MessagerieController&#xa;------------------------------&#xa;+ upload(request) : JsonResponse&#xa;+ uploadVoiceNote(request) : JsonResponse&#xa;+ store(request, conversation) : JsonResponse&#xa;+ index(request, conversation) : JsonResponse&#xa;+ conversations(request) : JsonResponse&#xa;- userBelongsToConversation(userId, conversation) : bool&#xa;- normalizeMediaInput(mediaInput) : array&#xa;- promoteMediaItem(item, conversationId, storedPaths, forcedKind) : array&#xa;- guessMessageKind(content, mediaPayload) : string&#xa;- guessMediaKind(mimeType) : string&#xa;- isAudioMimeType(mimeType) : bool" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=0;" vertex="1" parent="c1">
+          <mxGeometry x="70" y="450" width="450" height="310" as="geometry"/>
+        </mxCell>
+        <mxCell id="serviceController" value="ServiceController&#xa;------------------------------&#xa;+ creerService(request) : JsonResponse&#xa;+ voirService(request, service) : JsonResponse&#xa;+ validerService(request, service) : JsonResponse&#xa;+ terminerService(request, service) : JsonResponse&#xa;- userPeutAccederAuService(user, service) : bool" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#f5f5f5;strokeColor=#666666;rounded=0;" vertex="1" parent="c1">
+          <mxGeometry x="570" y="570" width="410" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="otherControllers" value="Autres controleurs API&#xa;------------------------------&#xa;AvisController&#xa;+ artisanAvis(request, artisan)&#xa;+ clientAvis(request, client)&#xa;+ store(request, user)&#xa;- buildAvisResponse(query, context, message)&#xa;&#xa;ClientController&#xa;+ appelsOffres(client)&#xa;+ services(client)&#xa;+ avis(client)&#xa;&#xa;CommentairesController&#xa;+ affichercommentaire(post)&#xa;+ postercommentaire(request)&#xa;&#xa;LikesController&#xa;+ like(request, postid)&#xa;&#xa;MetierController&#xa;+ index()&#xa;&#xa;NotificationController&#xa;+ index(request)&#xa;+ lire(request, notification)&#xa;+ toutLire(request)&#xa;&#xa;PlainteController&#xa;+ plaintes(request)" style="shape=rectangle;whiteSpace=wrap;html=1;align=left;verticalAlign=top;fontFamily=Courier New;fontSize=12;spacing=8;fillColor=#ffe6cc;strokeColor=#d79b00;rounded=0;" vertex="1" parent="c1">
+          <mxGeometry x="1040" y="380" width="410" height="560" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

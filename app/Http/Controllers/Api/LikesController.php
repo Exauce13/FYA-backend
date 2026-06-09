@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\PostLikeUpdated;
 use Illuminate\Http\Request;
 use App\Models\LikeModel;
 use App\Models\PostModel;
@@ -28,12 +29,18 @@ class LikesController extends Controller
             {
                 $like->delete();
                 $post->loadCount('likes');
+                $this->broadcastLikeUpdated($post->id, $user->id, false, $post->likes_count);
 
                 return response()->json([
                     'success' => true,
                     'message' => 'Like retiré avec succès.',
                     'liked' => false,
                     'likes_count' => $post->likes_count,
+                    'data' => [
+                        'post_id' => $post->id,
+                        'liked' => false,
+                        'likes_count' => $post->likes_count,
+                    ],
                 ]);
             }
             else{
@@ -43,12 +50,18 @@ class LikesController extends Controller
                 ]);
             }
             $post->loadCount('likes');
+            $this->broadcastLikeUpdated($post->id, $user->id, true, $post->likes_count);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Post aimé avec succès.',
                 'liked' => true,
                 'likes_count' => $post->likes_count,
+                'data' => [
+                    'post_id' => $post->id,
+                    'liked' => true,
+                    'likes_count' => $post->likes_count,
+                ],
                 'like' => $like,
             ]);
         }
@@ -64,6 +77,15 @@ class LikesController extends Controller
                 'message' => 'Erreur lors du like.',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    private function broadcastLikeUpdated(int $postId, int $userId, bool $liked, int $likesCount): void
+    {
+        try {
+            broadcast(new PostLikeUpdated($postId, $userId, $liked, $likesCount));
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 }
