@@ -46,7 +46,7 @@ class registerRequest extends FormRequest
         $isArtisan = $this->input('statut') === 'artisans';
 
         return [
-            'name' => ['required','max:100', "regex:/^[A-Za-zÀ-ÿ]+(?:[ '\-][A-Za-zÀ-ÿ]+)*$/"],
+            'name' => ['required','max:255', "regex:/^[A-Za-zÀ-ÿ]+(?:[ '\-][A-Za-zÀ-ÿ]+)*$/"],
             'email' => ['required','email', 'unique:users,email'],
             'password' =>['required','regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_\-#])[A-Za-z\d@$!%*?&_\-#]{8,12}$/'],
             'telephone' => ['required', 'max:10', 'unique:users,telephone',  'regex:/^01[4569][0-9]{7}$/'],

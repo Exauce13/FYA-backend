@@ -170,7 +170,7 @@ class UserController extends Controller
             'message' => 'Déconnexion réussie'
             ]);
     }
-    public function changementprofile(PhotoUpdateRequest $request): JsonResponse
+    public function changementphoto(PhotoUpdateRequest $request): JsonResponse
     {
         try {
             /** @var \App\Models\User|null $user */

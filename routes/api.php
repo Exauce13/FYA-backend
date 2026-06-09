@@ -36,7 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
 #déjà tester
     Route::prefix('users')->group(function () {
         Route::post('/logout', [UserController::class, 'logout']);
-        Route::post('/profile/photo', [UserController::class, 'changementprofile']);
+        Route::post('/profile/photo', [UserController::class, 'changementphoto']);
         Route::put('/updateinformation/{user}', [UserController::class, 'updateinfos']);
         Route::patch('/updatepassword', [UserController::class, 'updatemdp']);
         Route::get('/recherche-artisans', [UserController::class, 'rechercheArtisan']);
