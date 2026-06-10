@@ -34,4 +34,27 @@ class PaymentModel extends Model
     {
         return $this->belongsTo(ArtisanModel::class, 'artisan_id');
     }
+
+    public function resolveRouteBinding($value, $field = null)
+    {
+        $query = $this->query()
+            ->where('local_reference', $value)
+            ->orWhere('fedapay_transaction_id', $value);
+
+        if ($field) {
+            $query->orWhere($field, $value);
+        } elseif (ctype_digit((string) $value)) {
+            $query->orWhere($this->getRouteKeyName(), (int) $value);
+        }
+
+        if (str_starts_with((string) $value, 'PAY-')) {
+            $numericId = substr((string) $value, 4);
+
+            if (ctype_digit($numericId)) {
+                $query->orWhere('id', (int) $numericId);
+            }
+        }
+
+        return $query->first();
+    }
 }

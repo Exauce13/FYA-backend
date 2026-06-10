@@ -17,10 +17,12 @@ class Plainte extends Model
         'motif',
         'description',
         'statut_plainte',
+        'admin_status',
     ];
 
     protected $attributes = [
         'statut_plainte' => self::STATUT_EN_ATTENTE,
+        'admin_status' => self::STATUT_EN_ATTENTE,
     ];
 
     protected function casts(): array
@@ -39,5 +41,14 @@ class Plainte extends Model
     public function miseEnCause()
     {
         return $this->belongsTo(User::class, 'mise_en_cause_id');
+    }
+
+    public function resolveRouteBinding($value, $field = null)
+    {
+        if (str_starts_with((string) $value, 'REP-')) {
+            $value = substr((string) $value, 4);
+        }
+
+        return $this->query()->where($field ?? $this->getRouteKeyName(), $value)->first();
     }
 }

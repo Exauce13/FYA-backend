@@ -16,4 +16,9 @@ class MetierModel extends Model
     {
         return $this->hasMany(ArtisanModel::class, 'metier_id');
     }
+
+    public function appelsOffres()
+    {
+        return $this->hasMany(AppelOffreModel::class, 'metier_id');
+    }
 }

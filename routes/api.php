@@ -1,6 +1,13 @@
 <?php
 
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\AdminDashboardController;
+use App\Http\Controllers\Api\AdminNotificationController;
+use App\Http\Controllers\Api\AdminOfferController;
+use App\Http\Controllers\Api\AdminPaymentController;
+use App\Http\Controllers\Api\AdminReportController;
+use App\Http\Controllers\Api\AdminUserController;
+use App\Http\Controllers\Api\AdminVerificationController;
 use App\Http\Controllers\Api\ArtisanController;
 use App\Http\Controllers\Api\AppeloffreController;
 use App\Http\Controllers\Api\AvisController;
@@ -32,6 +39,38 @@ Route::get('/artisans/{artisan}/avis', [ArtisanController::class, 'artisanAvis']
 Route::match(['get', 'post'], '/fedapay/certification/{reference}/callback', [ArtisanController::class, 'fedapayCertificationCallback'])->name('fedapay.certification.callback');
 
 Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware('admin')->prefix('admin')->group(function () {
+        Route::get('/overview', [AdminDashboardController::class, 'overview']);
+
+        Route::get('/users', [AdminUserController::class, 'index']);
+        Route::get('/users/{user}', [AdminUserController::class, 'show']);
+        Route::patch('/users/{user}/suspend', [AdminUserController::class, 'suspend']);
+        Route::patch('/users/{user}/activate', [AdminUserController::class, 'activate']);
+
+        Route::get('/verifications', [AdminVerificationController::class, 'index']);
+        Route::get('/verifications/{artisan}', [AdminVerificationController::class, 'show']);
+        Route::patch('/verifications/{artisan}/validate', [AdminVerificationController::class, 'validateVerification']);
+        Route::patch('/verifications/{artisan}/cancel', [AdminVerificationController::class, 'cancelVerification']);
+        Route::get('/verifications/{artisan}/documents/{document}/download', [AdminVerificationController::class, 'downloadDocument']);
+
+        Route::get('/offers', [AdminOfferController::class, 'index']);
+        Route::get('/offers/{appelOffre}', [AdminOfferController::class, 'show']);
+        Route::delete('/offers/{appelOffre}', [AdminOfferController::class, 'destroy']);
+
+        Route::get('/reports', [AdminReportController::class, 'index']);
+        Route::get('/reports/{plainte}', [AdminReportController::class, 'show']);
+        Route::patch('/reports/{plainte}/treated', [AdminReportController::class, 'markAsTreated']);
+        Route::patch('/reports/{plainte}/ignored', [AdminReportController::class, 'ignore']);
+
+        Route::get('/payments/export', [AdminPaymentController::class, 'export']);
+        Route::get('/payments', [AdminPaymentController::class, 'index']);
+        Route::get('/payments/{payment}', [AdminPaymentController::class, 'show']);
+        Route::get('/payments/{payment}/receipt', [AdminPaymentController::class, 'downloadReceipt']);
+
+        Route::get('/notifications', [AdminNotificationController::class, 'index']);
+        Route::patch('/notifications/tout-lire', [AdminNotificationController::class, 'markAllAsRead']);
+        Route::patch('/notifications/{notification}/lire', [AdminNotificationController::class, 'markAsRead']);
+    });
 
 #déjà tester
     Route::prefix('users')->group(function () {
