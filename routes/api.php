@@ -132,6 +132,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('messagerie')->group(function () {
         Route::get('/conversations', [MessagerieController::class, 'conversations']);
+        Route::post('/conversations', [MessagerieController::class, 'createConversation']);
         Route::post('/messages/upload', [MessagerieController::class, 'upload']);
         Route::post('/messages/voice/upload', [MessagerieController::class, 'uploadVoiceNote']);
         Route::post('/conversations/{conversation}/messages', [MessagerieController::class, 'store']);

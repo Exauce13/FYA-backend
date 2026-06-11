@@ -297,21 +297,7 @@ class MessagerieController extends Controller
                 ])
                 ->latest()
                 ->get()
-                ->map(function (ConversationModel $conversation) {
-                    $participants = collect([$conversation->userOne, $conversation->userTwo])
-                        ->filter()
-                        ->values();
-
-                    return [
-                        'id' => $conversation->id,
-                        'title' => $conversation->title,
-                        'type' => $conversation->type,
-                        'users' => $participants,
-                        'last_message' => $conversation->messages->first(),
-                        'created_at' => $conversation->created_at,
-                        'updated_at' => $conversation->updated_at,
-                    ];
-                });
+                ->map(fn (ConversationModel $conversation) => $this->formatConversation($conversation));
 
             return response()->json([
                 'success' => true,
@@ -326,9 +312,104 @@ class MessagerieController extends Controller
             ], 500);
         }
     }
+    public function createConversation(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (! $user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifie.',
+                ], 401);
+            }
+
+            $validated = $request->validate([
+                'destinataire_id' => ['required', 'integer', 'exists:users,id'],
+                'type' => ['nullable', 'in:private'],
+                'title' => ['nullable', 'string', 'max:255'],
+            ]);
+
+            $destinataireId = (int) $validated['destinataire_id'];
+
+            if ($destinataireId === (int) $user->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous ne pouvez pas creer une conversation avec vous-meme.',
+                ], 422);
+            }
+
+            $firstUserId = min((int) $user->id, $destinataireId);
+            $secondUserId = max((int) $user->id, $destinataireId);
+
+            $conversation = ConversationModel::query()
+                ->where(function ($query) use ($user, $destinataireId) {
+                    $query->where('user_1_id', $user->id)
+                        ->where('user_2_id', $destinataireId);
+                })
+                ->orWhere(function ($query) use ($user, $destinataireId) {
+                    $query->where('user_1_id', $destinataireId)
+                        ->where('user_2_id', $user->id);
+                })
+                ->first();
+
+            if (! $conversation) {
+                $conversation = ConversationModel::create([
+                    'title' => $validated['title'] ?? null,
+                    'type' => 'private',
+                    'user_1_id' => $firstUserId,
+                    'user_2_id' => $secondUserId,
+                ]);
+            }
+
+            $conversation->load([
+                'userOne',
+                'userTwo',
+                'messages' => function ($query) {
+                    $query->latest()->limit(1);
+                },
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $conversation->wasRecentlyCreated
+                    ? 'Conversation creee avec succes.'
+                    : 'Conversation existante recuperee avec succes.',
+                'data' => $this->formatConversation($conversation),
+            ], $conversation->wasRecentlyCreated ? 201 : 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de validation.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Une erreur est survenue lors de la creation de la conversation.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
     private function userBelongsToConversation(int $userId, ConversationModel $conversation): bool
     {
         return $conversation->containsUser($userId);
+    }
+    private function formatConversation(ConversationModel $conversation): array
+    {
+        $participants = collect([$conversation->userOne, $conversation->userTwo])
+            ->filter()
+            ->values();
+
+        return [
+            'id' => $conversation->id,
+            'title' => $conversation->title,
+            'type' => $conversation->type,
+            'users' => $participants,
+            'last_message' => $conversation->messages->first(),
+            'created_at' => $conversation->created_at,
+            'updated_at' => $conversation->updated_at,
+        ];
     }
     private function normalizeMediaInput(mixed $mediaInput): array
     {
@@ -430,14 +511,19 @@ class MessagerieController extends Controller
             return false;
         }
 
-        return in_array($mimeType, [
+        $normalizedMimeType = strtolower(trim(explode(';', $mimeType)[0]));
+
+        return in_array($normalizedMimeType, [
             'audio/aac',
+            'audio/mp3',
             'audio/mpeg',
             'audio/mp4',
             'audio/ogg',
+            'audio/wave',
             'audio/wav',
             'audio/webm',
             'audio/x-m4a',
+            'audio/x-wav',
             'video/webm',
         ], true);
     }
