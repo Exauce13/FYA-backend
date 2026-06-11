@@ -102,10 +102,10 @@ class ArtisanController extends Controller
             }
 
             $transaction = $transactionResponse->json();
-            $transactionId = data_get($transaction, 'id') ?? data_get($transaction, 'transaction.id');
+            $transactionId = $this->extractFedapayTransactionId($transaction);
 
             if (! $transactionId) {
-                throw new Exception('Identifiant de transaction Fedapay introuvable.');
+                throw new Exception('Identifiant de transaction Fedapay introuvable. Reponse Fedapay: ' . $this->shortJson($transaction));
             }
 
             $tokenResponse = $this->fedapayRequest()->post($this->fedapayBaseUrl() . "/transactions/{$transactionId}/token");
@@ -114,9 +114,11 @@ class ArtisanController extends Controller
                 throw new Exception($tokenResponse->body());
             }
 
-            $paymentUrl = data_get($tokenResponse->json(), 'url');
+            $token = $tokenResponse->json();
+            $paymentUrl = $this->extractFedapayPaymentUrl($token);
+
             if (! $paymentUrl) {
-                throw new Exception('Lien de paiement Fedapay introuvable.');
+                throw new Exception('Lien de paiement Fedapay introuvable. Reponse Fedapay: ' . $this->shortJson($token));
             }
 
             $payment->update([
@@ -188,7 +190,7 @@ class ArtisanController extends Controller
                     'piece_identites' => $payload['piece_identites'] ?? null,
                     'nom_association' => $payload['nom_association'] ?? null,
                     'telephone_association' => $payload['telephone_association'] ?? null,
-                    'is_certifed' => true,
+                    'is_certifed' => false,
                 ]);
 
                 $payment->update([
@@ -490,8 +492,72 @@ class ArtisanController extends Controller
     private function fedapayBaseUrl(): string
     {
         return config('services.fedapay.environment') === 'sandbox'
-            ? 'https://api.fedapay.com/v1'
-            : 'https://sandbox-api.fedapay.com/v1';
+            ? 'https://sandbox-api.fedapay.com/v1'
+            : 'https://api.fedapay.com/v1';
+    }
+
+    private function extractFedapayTransactionId(array $payload): ?string
+    {
+        $transactionId = $this->firstScalarValue($payload, [
+            'id',
+            'transaction.id',
+            'data.id',
+            'data.transaction.id',
+            'v1/transaction.id',
+            'v1/transaction.transaction.id',
+        ]);
+
+        if ($transactionId) {
+            return $transactionId;
+        }
+
+        foreach ($payload as $key => $value) {
+            if (is_array($value) && str_contains((string) $key, 'transaction')) {
+                $transactionId = $this->firstScalarValue($value, ['id', 'transaction.id']);
+
+                if ($transactionId) {
+                    return $transactionId;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function extractFedapayPaymentUrl(array $payload): ?string
+    {
+        return $this->firstScalarValue($payload, [
+            'url',
+            'token.url',
+            'data.url',
+            'data.token.url',
+            'v1/token.url',
+            'v1/token.token.url',
+        ]);
+    }
+
+    private function firstScalarValue(array $payload, array $paths): ?string
+    {
+        foreach ($paths as $path) {
+            $value = data_get($payload, $path);
+
+            if (is_scalar($value) && $value !== '') {
+                return (string) $value;
+            }
+        }
+
+        return null;
+    }
+
+    private function shortJson(array $payload): string
+    {
+        $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        if (! is_string($json)) {
+            return '{}';
+        }
+
+        return Str::limit($json, 1000);
     }
 
     private function mapFedapayStatus(?string $status): string
