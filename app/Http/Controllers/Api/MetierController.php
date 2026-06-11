@@ -8,7 +8,7 @@ use Illuminate\Http\JsonResponse;
 
 class MetierController extends Controller
 {
-    public function index(): JsonResponse
+    public function listemetiers(): JsonResponse
     {
         $metiers = MetierModel::query()->orderBy('nom')->get();
 
