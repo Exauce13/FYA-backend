@@ -128,6 +128,70 @@ class ServiceController extends Controller
             ], 500);
         }
     }
+    public function modifierService(Request $request, ServiceModel $service): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            if (! $user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifie.',
+                ], 401);
+            }
+            if (! $user->artisan || $service->artisan_id !== $user->artisan->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Seul l artisan concerne peut modifier ce service.',
+                ], 403);
+            }
+            if ($service->statut !== 'en_attente') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ce service ne peut plus etre modifie car il a deja ete valide ou termine.',
+                ], 409);
+            }
+
+            $validated = $request->validate([
+                'titre' => ['sometimes', 'required', 'string', 'max:255'],
+                'description' => ['sometimes', 'required', 'string', 'max:1000'],
+                'montant' => ['sometimes', 'required', 'numeric', 'min:0'],
+                'duree_service' => ['sometimes', 'required', 'string', 'max:255'],
+                'devis' => ['sometimes', 'nullable', 'string', 'max:255'],
+            ]);
+
+            if (empty($validated)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Aucune donnee a modifier.',
+                ], 422);
+            }
+
+            $service->update(array_merge($validated, [
+                'client_lu_at' => null,
+                'client_valide_at' => null,
+            ]));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Service modifie avec succes. En attente de validation du client.',
+                'service' => $service->refresh()->load('client.user', 'artisan.user', 'message', 'appelOffre'),
+            ]);
+        }
+        catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de validation.',
+                'errors' => $e->errors(),
+            ], 422);
+        }
+        catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la modification du service.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
     public function validerService(Request $request, ServiceModel $service): JsonResponse
     {
         try {

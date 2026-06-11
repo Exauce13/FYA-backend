@@ -49,14 +49,33 @@ class ArtisanController extends Controller
 
         $diplomePath = null;
         $pieceIdentitePath = null;
+        $artisan = null;
+        $previousCertificationData = null;
+        $artisanCertificationUpdated = false;
 
         try {
             $artisan = $user->artisan;
+            $previousCertificationData = $artisan->only([
+                'diplome',
+                'piece_identites',
+                'nom_association',
+                'telephone_association',
+                'is_certifed',
+            ]);
             $localReference = 'CERT-' . Str::uuid();
             $amount = (int) config('services.fedapay.certification_amount', 1000);
 
             $diplomePath = $request->file('diplome')->store('certifications/diplomes', 'public');
             $pieceIdentitePath = ($request->file('piece_identites') ?? $request->file('piece_identite'))->store('certifications/pieces-identites', 'public');
+
+            $artisan->update([
+                'diplome' => $diplomePath,
+                'piece_identites' => $pieceIdentitePath,
+                'nom_association' => $validated['nom_association'],
+                'telephone_association' => $validated['telephone_association'],
+                'is_certifed' => false,
+            ]);
+            $artisanCertificationUpdated = true;
 
             $payment = PaymentModel::create([
                 'artisan_id' => $artisan->id,
@@ -136,6 +155,9 @@ class ArtisanController extends Controller
                 ],
             ], 201);
         } catch (\Throwable $e) {
+            if ($artisanCertificationUpdated && $artisan && $previousCertificationData) {
+                $artisan->update($previousCertificationData);
+            }
             if ($diplomePath) {
                 Storage::disk('public')->delete($diplomePath);
             }
