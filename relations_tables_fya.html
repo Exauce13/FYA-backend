@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Relations entre les tables - FYA</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 16mm 14mm;
+    }
+
+    body {
+      color: #17202a;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    h1 {
+      color: #1f5b87;
+      font-size: 22px;
+      margin: 0 0 4px;
+      text-align: center;
+    }
+
+    .subtitle {
+      color: #566573;
+      font-size: 12px;
+      margin: 0 0 18px;
+      text-align: center;
+    }
+
+    h2 {
+      border-bottom: 2px solid #1f5b87;
+      color: #1f5b87;
+      font-size: 15px;
+      margin: 18px 0 8px;
+      padding-bottom: 4px;
+    }
+
+    table {
+      border-collapse: collapse;
+      margin: 8px 0 14px;
+      width: 100%;
+    }
+
+    th,
+    td {
+      border: 1px solid #ccd6dd;
+      padding: 6px 7px;
+      vertical-align: top;
+    }
+
+    th {
+      background: #edf5fb;
+      color: #1f5b87;
+      font-weight: 700;
+      text-align: left;
+    }
+
+    tr:nth-child(even) td {
+      background: #fafcfe;
+    }
+
+    .note {
+      background: #fff8ef;
+      border-left: 4px solid #c26b21;
+      margin: 10px 0 14px;
+      padding: 8px 10px;
+    }
+
+    .small {
+      color: #566573;
+      font-size: 10px;
+    }
+
+    .relation {
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .page-break {
+      break-before: page;
+    }
+  </style>
+</head>
+<body>
+  <h1>Liste des relations entre les tables - FYA</h1>
+  <p class="subtitle">Back-end Laravel - relations issues des migrations et des modèles Eloquent</p>
+
+  <div class="note">
+    <strong>Légende :</strong>
+    <span class="relation">1 - 1</span> signifie une relation unique,
+    <span class="relation">1 - N</span> signifie qu'un enregistrement parent possède plusieurs enregistrements enfants,
+    et <span class="relation">0..1</span> indique une relation optionnelle.
+  </div>
+
+  <h2>Relations principales du domaine FYA</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Table source</th>
+        <th>Clé étrangère</th>
+        <th>Table cible</th>
+        <th>Cardinalité</th>
+        <th>Description métier</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>artisans</td>
+        <td>user_id</td>
+        <td>users.id</td>
+        <td>users 1 - 0..1 artisans</td>
+        <td>Un utilisateur ayant le statut artisan possède un profil artisan.</td>
+      </tr>
+      <tr>
+        <td>clients</td>
+        <td>user_id</td>
+        <td>users.id</td>
+        <td>users 1 - 0..1 clients</td>
+        <td>Un utilisateur client possède un profil client.</td>
+      </tr>
+      <tr>
+        <td>artisans</td>
+        <td>metier_id</td>
+        <td>metiers.id</td>
+        <td>metiers 1 - N artisans</td>
+        <td>Un métier peut être exercé par plusieurs artisans.</td>
+      </tr>
+      <tr>
+        <td>posts</td>
+        <td>artisan_id</td>
+        <td>artisans.id</td>
+        <td>artisans 1 - N posts</td>
+        <td>Un artisan peut publier plusieurs réalisations, services ou promotions.</td>
+      </tr>
+      <tr>
+        <td>commentaires</td>
+        <td>post_id</td>
+        <td>posts.id</td>
+        <td>posts 1 - N commentaires</td>
+        <td>Une publication peut recevoir plusieurs commentaires.</td>
+      </tr>
+      <tr>
+        <td>commentaires</td>
+        <td>user_id</td>
+        <td>users.id</td>
+        <td>users 1 - N commentaires</td>
+        <td>Un utilisateur peut commenter plusieurs publications.</td>
+      </tr>
+      <tr>
+        <td>likes</td>
+        <td>post_id</td>
+        <td>posts.id</td>
+        <td>posts 1 - N likes</td>
+        <td>Une publication peut recevoir plusieurs likes.</td>
+      </tr>
+      <tr>
+        <td>likes</td>
+        <td>user_id</td>
+        <td>users.id</td>
+        <td>users 1 - N likes</td>
+        <td>Un utilisateur peut aimer plusieurs publications.</td>
+      </tr>
+      <tr>
+        <td>appels_offres</td>
+        <td>user_id</td>
+        <td>users.id</td>
+        <td>users 1 - N appels_offres</td>
+        <td>Un utilisateur, généralement client, peut créer plusieurs appels d'offres.</td>
+      </tr>
+      <tr>
+        <td>appels_offres</td>
+        <td>metier_id</td>
+        <td>metiers.id</td>
+        <td>metiers 1 - N appels_offres</td>
+        <td>Un appel d'offres peut être rattaché à un métier.</td>
+      </tr>
+      <tr>
+        <td>candidatures</td>
+        <td>appeloffer_id</td>
+        <td>appels_offres.id</td>
+        <td>appels_offres 1 - N candidatures</td>
+        <td>Un appel d'offres peut recevoir plusieurs candidatures.</td>
+      </tr>
+      <tr>
+        <td>candidatures</td>
+        <td>artisan_id</td>
+        <td>artisans.id</td>
+        <td>artisans 1 - N candidatures</td>
+        <td>Un artisan peut postuler à plusieurs appels d'offres.</td>
+      </tr>
+      <tr>
+        <td>services</td>
+        <td>client_id</td>
+        <td>clients.id</td>
+        <td>clients 1 - N services</td>
+        <td>Un client peut avoir plusieurs prestations de service.</td>
+      </tr>
+      <tr>
+        <td>services</td>
+        <td>artisan_id</td>
+        <td>artisans.id</td>
+        <td>artisans 1 - N services</td>
+        <td>Un artisan peut réaliser plusieurs prestations.</td>
+      </tr>
+      <tr>
+        <td>services</td>
+        <td>message_id</td>
+        <td>messages.id</td>
+        <td>messages 1 - 0..1 services</td>
+        <td>Une proposition de service peut être créée à partir d'un message.</td>
+      </tr>
+      <tr>
+        <td>services</td>
+        <td>appeloffer_id</td>
+        <td>appels_offres.id</td>
+        <td>appels_offres 0..1 - N services</td>
+        <td>Un service peut être lié à un appel d'offres accepté.</td>
+      </tr>
+      <tr>
+        <td>payments</td>
+        <td>artisan_id</td>
+        <td>artisans.id</td>
+        <td>artisans 1 - N payments</td>
+        <td>Un artisan peut effectuer plusieurs paiements, par exemple certification ou boost.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 class="page-break">Relations de messagerie, avis, plaintes et notifications</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Table source</th>
+        <th>Clé étrangère</th>
+        <th>Table cible</th>
+        <th>Cardinalité</th>
+        <th>Description métier</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>conversations</td>
+        <td>user_1_id</td>
+        <td>users.id</td>
+        <td>users 1 - N conversations</td>
+        <td>Premier participant d'une conversation.</td>
+      </tr>
+      <tr>
+        <td>conversations</td>
+        <td>user_2_id</td>
+        <td>users.id</td>
+        <td>users 1 - N conversations</td>
+        <td>Deuxième participant d'une conversation.</td>
+      </tr>
+      <tr>
+        <td>messages</td>
+        <td>conversation_id</td>
+        <td>conversations.id</td>
+        <td>conversations 1 - N messages</td>
+        <td>Une conversation contient plusieurs messages.</td>
+      </tr>
+      <tr>
+        <td>messages</td>
+        <td>expediteur_id</td>
+        <td>users.id</td>
+        <td>users 1 - N messages</td>
+        <td>Un utilisateur peut envoyer plusieurs messages.</td>
+      </tr>
+      <tr>
+        <td>messages</td>
+        <td>destinataire_id</td>
+        <td>users.id</td>
+        <td>users 1 - N messages</td>
+        <td>Un utilisateur peut recevoir plusieurs messages.</td>
+      </tr>
+      <tr>
+        <td>messages</td>
+        <td>appel_offre_id</td>
+        <td>appels_offres.id</td>
+        <td>appels_offres 0..1 - N messages</td>
+        <td>Un message peut faire référence à un appel d'offres.</td>
+      </tr>
+      <tr>
+        <td>avis</td>
+        <td>auteur_id</td>
+        <td>users.id</td>
+        <td>users 1 - N avis</td>
+        <td>Un utilisateur peut rédiger plusieurs avis.</td>
+      </tr>
+      <tr>
+        <td>avis</td>
+        <td>cible_id</td>
+        <td>users.id</td>
+        <td>users 1 - N avis</td>
+        <td>Un utilisateur peut recevoir plusieurs avis.</td>
+      </tr>
+      <tr>
+        <td>plaintes</td>
+        <td>plaignant_id</td>
+        <td>users.id</td>
+        <td>users 1 - N plaintes</td>
+        <td>Un utilisateur peut déposer plusieurs plaintes.</td>
+      </tr>
+      <tr>
+        <td>plaintes</td>
+        <td>mise_en_cause_id</td>
+        <td>users.id</td>
+        <td>users 1 - N plaintes</td>
+        <td>Un utilisateur peut être mis en cause dans plusieurs plaintes.</td>
+      </tr>
+      <tr>
+        <td>notifications</td>
+        <td>user_id</td>
+        <td>users.id</td>
+        <td>users 1 - N notifications</td>
+        <td>Un utilisateur peut recevoir plusieurs notifications.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Tables techniques Laravel</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Table source</th>
+        <th>Clé / lien</th>
+        <th>Table cible</th>
+        <th>Rôle</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>personal_access_tokens</td>
+        <td>tokenable_id, tokenable_type</td>
+        <td>users via relation polymorphique</td>
+        <td>Gestion des tokens d'authentification Laravel Sanctum.</td>
+      </tr>
+      <tr>
+        <td>sessions</td>
+        <td>user_id</td>
+        <td>users.id</td>
+        <td>Association optionnelle d'une session à un utilisateur connecté.</td>
+      </tr>
+      <tr>
+        <td>password_reset_tokens</td>
+        <td>email</td>
+        <td>users.email</td>
+        <td>Réinitialisation de mot de passe par adresse e-mail.</td>
+      </tr>
+      <tr>
+        <td>cache, cache_locks, jobs, job_batches, failed_jobs</td>
+        <td>Aucune relation métier directe</td>
+        <td>-</td>
+        <td>Tables internes de cache, files d'attente et tâches échouées.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="small">Document généré pour le mémoire FYA à partir du back-end Laravel.</p>
+</body>
+</html>

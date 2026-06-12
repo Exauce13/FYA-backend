@@ -233,6 +233,49 @@ class ServiceController extends Controller
             ], 500);
         }
     }
+    public function annulerService(Request $request, ServiceModel $service): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            if (! $user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Utilisateur non authentifie.',
+                ], 401);
+            }
+            if (! $user->client || $service->client_id !== $user->client->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Seul le client concerne peut annuler ce service.',
+                ], 403);
+            }
+            if ($service->statut !== 'en_attente') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ce service ne peut plus etre annule.',
+                ], 409);
+            }
+
+            $service->update([
+                'client_lu_at' => $service->client_lu_at ?? now(),
+                'client_valide_at' => null,
+                'statut' => 'annule',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Service annule avec succes.',
+                'service' => $service->refresh()->load('client.user', 'artisan.user', 'message', 'appelOffre'),
+            ]);
+        }
+        catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de l annulation du service.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
     public function terminerService(Request $request, ServiceModel $service): JsonResponse
     {
         try {
@@ -253,6 +296,12 @@ class ServiceController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Le client doit d abord valider ce service.',
+                ], 409);
+            }
+            if ($service->statut === 'annule') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ce service est annule et ne peut plus etre termine.',
                 ], 409);
             }
             if ($service->statut === 'terminer') {

@@ -35,7 +35,7 @@ class AvisController extends Controller
             'Avis du client recuperes avec succes.'
         );
     }
-    public function store(StoreAvisRequest $request, User $user): JsonResponse
+    public function storeAvis(StoreAvisRequest $request, User $user): JsonResponse
     {
         try {
             $auteur = $request->user();

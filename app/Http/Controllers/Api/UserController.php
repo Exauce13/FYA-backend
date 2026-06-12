@@ -61,9 +61,12 @@ class UserController extends Controller
                         'telephone_association' => $validated['telephone_association'] ?? null,
                         'diplome' => $validated['diplome'] ?? null,
                     ]);
+                    ClientModel::firstOrCreate([
+                        'user_id' => $user->id,
+                    ]);
                 }
                 if ($validated['statut'] === 'clients') {
-                    ClientModel::create([
+                    ClientModel::firstOrCreate([
                         'user_id' => $user->id,
                     ]);
                 }

@@ -32,7 +32,8 @@ Route::middleware(['guest'])->group(function(){
     // Route utilisée pour alimenter les listes de métiers dans les formulaires (id + nom).
     Route::get('/metiers', [MetierController::class, 'listesmetiers']);
 });
-
+Route::get('/{post}/commentaires', [CommentairesController::class, 'affichercommentaire']);
+Route::get('/recherche-artisans', [UserController::class, 'rechercheArtisan']);
 Route::get('/posts/feed', [ArtisanController::class, 'feedPosts']);
 Route::get('/artisans/{artisan}/posts', [ArtisanController::class, 'artisanPosts']);
 Route::get('/artisans/{artisan}/avis', [ArtisanController::class, 'artisanAvis']);
@@ -78,13 +79,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/profile/photo', [UserController::class, 'changementphoto']);
         Route::put('/updateinformation/{user}', [UserController::class, 'updateinfos']);
         Route::patch('/updatepassword', [UserController::class, 'updatemdp']);
-        Route::get('/recherche-artisans', [UserController::class, 'rechercheArtisan']);
+
     });
 
     Route::prefix('posts')->group(function () {
         Route::post('/creerposts', [ArtisanController::class, 'createposte']);
         Route::post('/{postid}/like', [LikesController::class, 'like']);
-        Route::get('/{post}/commentaires', [CommentairesController::class, 'affichercommentaire']);
         Route::post('/commentaires', [CommentairesController::class, 'postercommentaire']);
     });
 
@@ -110,6 +110,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{service}', [ServiceController::class, 'voirService']);
         Route::patch('/{service}', [ServiceController::class, 'modifierService']);
         Route::patch('/{service}/valider', [ServiceController::class, 'validerService']);
+        Route::patch('/{service}/annuler', [ServiceController::class, 'annulerService']);
         Route::patch('/{service}/terminer', [ServiceController::class, 'terminerService']);
     });
 
@@ -120,7 +121,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::prefix('avis')->group(function () {
-        Route::post('/users/{user}', [AvisController::class, 'store']);
+        Route::post('/users/{user}', [AvisController::class, 'storeAvis']);
         Route::get('/artisans/{artisan}', [AvisController::class, 'artisanAvis']);
         Route::get('/clients/{client}', [AvisController::class, 'clientAvis']);
     });

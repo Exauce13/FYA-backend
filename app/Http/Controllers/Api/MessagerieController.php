@@ -289,8 +289,10 @@ class MessagerieController extends Controller
                     $query->where('user_1_id', $user->id)->orWhere('user_2_id', $user->id);
                 })
                 ->with([
-                    'userOne',
-                    'userTwo',
+                    'userOne.client',
+                    'userOne.artisan',
+                    'userTwo.client',
+                    'userTwo.artisan',
                     'messages' => function ($query) {
                         $query->latest()->limit(1);
                     },
@@ -363,8 +365,10 @@ class MessagerieController extends Controller
             }
 
             $conversation->load([
-                'userOne',
-                'userTwo',
+                'userOne.client',
+                'userOne.artisan',
+                'userTwo.client',
+                'userTwo.artisan',
                 'messages' => function ($query) {
                     $query->latest()->limit(1);
                 },
