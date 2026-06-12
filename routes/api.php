@@ -107,6 +107,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('services')->group(function () {
         Route::post('/services', [ServiceController::class, 'creerService']);
+        Route::get('/artisans/{artisan}', [ServiceController::class, 'serviceArtisan']);
+        Route::get('/clients/{client}', [ServiceController::class, 'serviceClient']);
         Route::get('/{service}', [ServiceController::class, 'voirService']);
         Route::patch('/{service}', [ServiceController::class, 'modifierService']);
         Route::patch('/{service}/valider', [ServiceController::class, 'validerService']);

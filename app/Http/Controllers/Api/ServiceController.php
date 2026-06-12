@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ArtisanModel;
 use App\Models\ClientModel;
 use App\Models\MessageModel;
 use App\Models\ServiceModel;
@@ -128,6 +129,85 @@ class ServiceController extends Controller
             ], 500);
         }
     }
+
+    public function serviceArtisan(ArtisanModel $artisan): JsonResponse
+    {
+        try {
+            $statuts = ['terminer', 'annule', 'en_cours', 'en_attente'];
+
+            $services = ServiceModel::query()
+                ->where('artisan_id', $artisan->id)
+                ->whereIn('statut', $statuts)
+                ->with(['client.user', 'artisan.user', 'message', 'appelOffre.metier'])
+                ->latest()
+                ->get()
+                ->groupBy('statut');
+
+            $servicesParStatut = collect($statuts)
+                ->mapWithKeys(fn (string $statut) => [$statut => $services->get($statut, collect())->values()]);
+
+            $comptes = $servicesParStatut
+                ->map(fn ($items) => $items->count());
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Services de l artisan recuperes avec succes.',
+                'data' => [
+                    'artisan' => $artisan->load('user', 'metier'),
+                    'comptes' => $comptes,
+                    'total' => $comptes->sum(),
+                    'services' => $servicesParStatut,
+                ],
+            ]);
+        }
+        catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la recuperation des services de l artisan.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function serviceClient(ClientModel $client): JsonResponse
+    {
+        try {
+            $statuts = ['terminer', 'annule', 'en_cours', 'en_attente'];
+
+            $services = ServiceModel::query()
+                ->where('client_id', $client->id)
+                ->whereIn('statut', $statuts)
+                ->with(['client.user', 'artisan.user', 'message', 'appelOffre.metier'])
+                ->latest()
+                ->get()
+                ->groupBy('statut');
+
+            $servicesParStatut = collect($statuts)
+                ->mapWithKeys(fn (string $statut) => [$statut => $services->get($statut, collect())->values()]);
+
+            $comptes = $servicesParStatut
+                ->map(fn ($items) => $items->count());
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Services du client recuperes avec succes.',
+                'data' => [
+                    'client' => $client->load('user'),
+                    'comptes' => $comptes,
+                    'total' => $comptes->sum(),
+                    'services' => $servicesParStatut,
+                ],
+            ]);
+        }
+        catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la recuperation des services du client.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function modifierService(Request $request, ServiceModel $service): JsonResponse
     {
         try {
