@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\LikeModel;
 use App\Models\PostModel;
 use App\Http\Controllers\Controller;
+use App\Services\NotificationService;
 use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -23,7 +24,7 @@ class LikesController extends Controller
                     'message' => 'Utilisateur non authentifie.',
                 ], 401);
             }
-            $post = PostModel::findOrFail($postid);
+            $post = PostModel::with('artisanP.user')->findOrFail($postid);
             $like = LikeModel::where('user_id', $user->id)->where('post_id', $postid)->first();
             if($like)
             {
@@ -51,6 +52,7 @@ class LikesController extends Controller
             }
             $post->loadCount('likes');
             $this->broadcastLikeUpdated($post->id, $user->id, true, $post->likes_count);
+            $this->notifyPostOwner($post, $user->id, $user->name);
 
             return response()->json([
                 'success' => true,
@@ -84,6 +86,30 @@ class LikesController extends Controller
     {
         try {
             broadcast(new PostLikeUpdated($postId, $userId, $liked, $likesCount));
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    private function notifyPostOwner(PostModel $post, int $likerId, string $likerName): void
+    {
+        $ownerUserId = $post->artisanP?->user_id;
+
+        if (! $ownerUserId || (int) $ownerUserId === $likerId) {
+            return;
+        }
+
+        try {
+            app(NotificationService::class)->sendMany([[
+                'user_id' => $ownerUserId,
+                'type' => 'post_like',
+                'data_json' => [
+                    'post_id' => $post->id,
+                    'liker_id' => $likerId,
+                    'liker_name' => $likerName,
+                    'likes_count' => $post->likes_count,
+                ],
+            ]]);
         } catch (\Throwable $e) {
             report($e);
         }

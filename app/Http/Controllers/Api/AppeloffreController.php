@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\AppelOffreCreated;
+use App\Events\CandidatureCreated;
+use App\Events\CandidatureStatusUpdated;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Http\Requests\AppelOffresRequest;
@@ -80,6 +83,10 @@ class AppeloffreController extends Controller
                 if ($notifications) {
                     app(NotificationService::class)->sendMany($notifications);
                 }
+
+                DB::afterCommit(function () use ($appelOffre): void {
+                    broadcast(new AppelOffreCreated($appelOffre->fresh(['user', 'metier'])));
+                });
 
                 return [$appelOffre, count($notifications)];
             });
@@ -266,13 +273,36 @@ class AppeloffreController extends Controller
                 $devisPath = $request->file('devis_propose')->store('devis', 'public');
             }
 
-            $candidature = CandidatureModel::create([
-                'appeloffer_id' => $appelOffre->id,
-                'artisan_id' => $artisan->id,
-                'description' => $validated['description'],
-                'devis_propose' => $devisPath,
-                'statut' => 'en_attente',
-            ]);
+            $candidature = DB::transaction(function () use ($appelOffre, $artisan, $user, $validated, $devisPath) {
+                $candidature = CandidatureModel::create([
+                    'appeloffer_id' => $appelOffre->id,
+                    'artisan_id' => $artisan->id,
+                    'description' => $validated['description'],
+                    'devis_propose' => $devisPath,
+                    'statut' => 'en_attente',
+                ]);
+
+                app(NotificationService::class)->sendMany([[
+                    'user_id' => $appelOffre->user_id,
+                    'type' => 'nouvelle_candidature',
+                    'data_json' => [
+                        'candidature_id' => $candidature->id,
+                        'appel_offre_id' => $appelOffre->id,
+                        'artisan_id' => $artisan->id,
+                        'artisan_user_id' => $user->id,
+                        'artisan_name' => $user->name,
+                        'titre' => $appelOffre->titre,
+                        'description' => $validated['description'],
+                    ],
+                ]]);
+
+                DB::afterCommit(function () use ($candidature): void {
+                    broadcast(new CandidatureCreated($candidature->fresh(['artisan.user', 'appelOffre'])));
+                });
+
+                return $candidature;
+            });
+
             return response()->json([
                 'success' => true,
                 'message' => 'Candidature envoyee avec succes.',
@@ -372,6 +402,14 @@ class AppeloffreController extends Controller
                 }
 
                 app(NotificationService::class)->sendMany($notifications);
+
+                DB::afterCommit(function () use ($candidature, $autresCandidatures): void {
+                    broadcast(new CandidatureStatusUpdated($candidature->fresh(['artisan.user', 'appelOffre'])));
+
+                    foreach ($autresCandidatures as $autreCandidature) {
+                        broadcast(new CandidatureStatusUpdated($autreCandidature->fresh(['artisan.user', 'appelOffre'])));
+                    }
+                });
 
                 return count($notifications);
             });

@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\MetierController;
 use App\Http\Controllers\Api\LikesController;
 use App\Http\Controllers\Api\MessagerieController;
 use App\Http\Controllers\Api\PlainteController;
+use App\Http\Controllers\Api\PresenceController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ServiceController;
 use Illuminate\Http\Request;
@@ -132,6 +133,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [NotificationController::class, 'index']);
         Route::patch('/tout-lire', [NotificationController::class, 'toutLire']);
         Route::patch('/{notification}/lire', [NotificationController::class, 'lire']);
+    });
+
+    Route::prefix('presence')->group(function () {
+        Route::post('/online', [PresenceController::class, 'online']);
+        Route::post('/offline', [PresenceController::class, 'offline']);
     });
 
     Route::prefix('messagerie')->group(function () {
