@@ -113,7 +113,7 @@ class AppeloffreController extends Controller
             ], 500);
         }
     }
-    public function closeappeloffre($id, Request $request){
+    public function closeappeloffre(int $id, Request $request){
         try{
             $appelOffreclose = AppelOffreModel::findOrFail($id);
             if($appelOffreclose->user_id !== $request->user()->id){
