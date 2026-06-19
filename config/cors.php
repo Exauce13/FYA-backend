@@ -24,6 +24,7 @@ return [
     'http://localhost:5174',
     'http://192.168.1.93:5173',
     'http://192.168.1.93:5174',
+    'https://fya-tau.vercel.app',
 ],
 
     'allowed_origins_patterns' => [],

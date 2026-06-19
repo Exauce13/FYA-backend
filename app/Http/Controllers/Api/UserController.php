@@ -3,30 +3,32 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\registerRequest;
 use App\Http\Requests\AuthenticateRequest;
 use App\Http\Requests\PhotoUpdateRequest;
+use App\Http\Requests\registerRequest;
 use App\Http\Requests\UpdateInfoRequest;
 use App\Http\Requests\UpdatePasswordRequest;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Session;
-use Illuminate\Http\JsonResponse;
-use App\Models\AppelOffreModel;
-use App\Models\AvisModel;
 use App\Models\ArtisanModel;
 use App\Models\ClientModel;
 use App\Models\MetierModel;
 use App\Models\User;
+use Exception;
 use Illuminate\Auth\Events\Verified;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Exception;
+use Illuminate\Support\Str;
 
 class UserController extends Controller
 {
+    private const LOGIN_MAX_ATTEMPTS = 3;
+
+    private const LOGIN_LOCK_SECONDS = 3600;
+
     public function register(registerRequest $request)
     {
         try {
@@ -54,7 +56,7 @@ class UserController extends Controller
                     ArtisanModel::create([
                         'user_id' => $user->id,
                         'metier_id' => $metierId,
-                        'bio' => $validated['bio']  ?? null,
+                        'bio' => $validated['bio'] ?? null,
                         'npi' => $validated['npi'],
                         'annees_experiences' => $validated['annees_experiences'],
                         'nom_association' => $validated['nom_association'] ?? null,
@@ -70,6 +72,7 @@ class UserController extends Controller
                         'user_id' => $user->id,
                     ]);
                 }
+
                 return $user;
             });
 
@@ -80,8 +83,7 @@ class UserController extends Controller
                 'message' => 'Inscription effectuee avec succes. Veuillez verifier votre adresse email.',
                 'user' => $user,
             ], 201);
-        }
-        catch (Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de l inscription.',
@@ -111,6 +113,7 @@ class UserController extends Controller
             'message' => 'Adresse email verifiee avec succes.',
         ]);
     }
+
     public function resendVerificationEmail(Request $request)
     {
         $validated = $request->validate([
@@ -128,18 +131,36 @@ class UserController extends Controller
             'message' => 'Si cette adresse existe et n est pas encore verifiee, un nouveau lien a ete envoye.',
         ]);
     }
+
     public function authenticate(AuthenticateRequest $request): JsonResponse
     {
         try {
             $credentials = $request->validated();
+            $throttleKey = $this->loginThrottleKey($request, $credentials['email']);
+
+            if (RateLimiter::tooManyAttempts($throttleKey, self::LOGIN_MAX_ATTEMPTS)) {
+                return $this->loginLockedResponse($throttleKey);
+            }
+
             $user = User::where('email', $credentials['email'])->first();
 
             if (! $user || ! Hash::check($credentials['password'], $user->password)) {
+                RateLimiter::hit($throttleKey, self::LOGIN_LOCK_SECONDS);
+
+                $remainingAttempts = RateLimiter::remaining($throttleKey, self::LOGIN_MAX_ATTEMPTS);
+
+                if ($remainingAttempts <= 0) {
+                    return $this->loginLockedResponse($throttleKey);
+                }
+
                 return response()->json([
                     'success' => false,
-                    'message' => 'Identifiants incorrects.',
+                    'message' => 'Identifiants incorrects. Il vous reste '.$remainingAttempts.' tentative(s).',
+                    'tentatives_restantes' => $remainingAttempts,
                 ], 401);
             }
+
+            RateLimiter::clear($throttleKey);
 
             if (! $user->hasVerifiedEmail()) {
                 return response()->json([
@@ -157,8 +178,7 @@ class UserController extends Controller
                 'token' => $token,
                 'token_type' => 'Bearer',
             ]);
-        }
-        catch (Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la connexion.',
@@ -166,17 +186,37 @@ class UserController extends Controller
             ], 500);
         }
     }
+
+    private function loginThrottleKey(Request $request, string $email): string
+    {
+        return Str::lower($email).'|'.$request->ip();
+    }
+
+    private function loginLockedResponse(string $throttleKey): JsonResponse
+    {
+        $retryAfter = RateLimiter::availableIn($throttleKey);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Trop de tentatives de connexion. Veuillez reessayer dans 1 heure.',
+            'tentatives_restantes' => 0,
+            'retry_after' => $retryAfter,
+        ], 429);
+    }
+
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
+
         return response()->json([
-            'message' => 'Déconnexion réussie'
-            ]);
+            'message' => 'Déconnexion réussie',
+        ]);
     }
+
     public function changementphoto(PhotoUpdateRequest $request): JsonResponse
     {
         try {
-            /** @var \App\Models\User|null $user */
+            /** @var User|null $user */
             $user = $request->user();
             if (! $user) {
                 return response()->json([
@@ -190,6 +230,7 @@ class UserController extends Controller
             $path = $request->file('photo')->store('profile-photos', 'public');
             $user->photo = $path;
             $user->save();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Photo de profil modifiee avec succes.',
@@ -197,8 +238,7 @@ class UserController extends Controller
                 'photo_url' => Storage::url($path),
                 'user' => $user,
             ]);
-        }
-        catch (Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la modification de la photo de profil.',
@@ -206,8 +246,10 @@ class UserController extends Controller
             ], 500);
         }
     }
-    public function updateinfos(User $user, UpdateInfoRequest $request){
-        try{
+
+    public function updateinfos(User $user, UpdateInfoRequest $request)
+    {
+        try {
             $validated = $request->validated();
 
             $user->fill([
@@ -238,15 +280,15 @@ class UserController extends Controller
                 'message' => 'Modification effectuee avec succes.',
                 'user' => $user,
             ], 200);
-        }
-        catch(Exception $e){
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la modification des informations',
                 'error' => $e->getMessage(),
-            ],500);
+            ], 500);
         }
     }
+
     public function updatemdp(UpdatePasswordRequest $request): JsonResponse
     {
         try {
@@ -286,8 +328,7 @@ class UserController extends Controller
                 'success' => true,
                 'message' => 'Mot de passe modifie avec succes.',
             ], 200);
-        }
-        catch (Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la modification du mot de passe.',
@@ -295,6 +336,7 @@ class UserController extends Controller
             ], 500);
         }
     }
+
     public function rechercheArtisan(Request $request): JsonResponse
     {
         try {
@@ -319,12 +361,12 @@ class UserController extends Controller
                 ->where('metier_id', (int) $validated['metier_id'])
                 ->when(! empty($validated['ville'] ?? null), function ($query) use ($validated) {
                     $query->whereHas('user', function ($userQuery) use ($validated) {
-                        $userQuery->where('ville', 'like', '%' . $validated['ville'] . '%');
+                        $userQuery->where('ville', 'like', '%'.$validated['ville'].'%');
                     });
                 })
                 ->when(! empty($validated['quartier'] ?? null), function ($query) use ($validated) {
                     $query->whereHas('user', function ($userQuery) use ($validated) {
-                        $userQuery->where('quartier', 'like', '%' . $validated['quartier'] . '%');
+                        $userQuery->where('quartier', 'like', '%'.$validated['quartier'].'%');
                     });
                 })
                 ->when($request->boolean('certifie'), function ($query) {
@@ -368,8 +410,7 @@ class UserController extends Controller
                 'message' => 'Recherche effectuee avec succes.',
                 'artisans' => $artisans,
             ]);
-        }
-        catch(Exception $e){
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la recherche des artisans.',
@@ -377,5 +418,4 @@ class UserController extends Controller
             ], 500);
         }
     }
-
 }
