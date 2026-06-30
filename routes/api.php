@@ -31,7 +31,7 @@ Route::middleware(['guest'])->group(function(){
     Route::get('/email/verify/{id}/{hash}', [UserController::class, 'verifyEmail'])->middleware('signed')->name('verification.verify');
     Route::post('/email/verification-notification', [UserController::class, 'resendVerificationEmail']);
     // Route utilisée pour alimenter les listes de métiers dans les formulaires (id + nom).
-    Route::get('/metiers', [MetierController::class, 'listesmetiers']);
+    Route::get('/metiers', [MetierController::class, 'listemetiers']);
 });
 Route::get('/{post}/commentaires', [CommentairesController::class, 'affichercommentaire']);
 Route::get('/recherche-artisans', [UserController::class, 'rechercheArtisan']);
