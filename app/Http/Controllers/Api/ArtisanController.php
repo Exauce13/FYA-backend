@@ -150,6 +150,7 @@ class ArtisanController extends Controller
                 'message' => 'Demande recue. Redirigez l artisan vers Fedapay pour effectuer le paiement.',
                 'data' => [
                     'payment_id' => $payment->id,
+                    'local_reference' => $localReference,
                     'fedapay_transaction_id' => (string) $transactionId,
                     'payment_url' => $paymentUrl,
                 ],
@@ -181,54 +182,7 @@ class ArtisanController extends Controller
                 ->where('type_evenement', 'certification_artisan')
                 ->firstOrFail();
 
-            $transactionResponse = $this->fedapayRequest()->get($this->fedapayBaseUrl() . "/transactions/{$payment->fedapay_transaction_id}");
-
-            if ($transactionResponse->failed()) {
-                throw new Exception($transactionResponse->body());
-            }
-
-            $transaction = $transactionResponse->json();
-            $fedapayStatus = data_get($transaction, 'status') ?? data_get($transaction, 'transaction.status');
-            $status = $this->mapFedapayStatus($fedapayStatus);
-
-            if ($status !== 'paid') {
-                $payment->update(['statut' => $status]);
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Le paiement Fedapay n est pas encore valide.',
-                    'data' => [
-                        'payment_status' => $status,
-                        'fedapay_status' => $fedapayStatus,
-                    ],
-                ], 202);
-            }
-
-            DB::transaction(function () use ($payment): void {
-                $payload = $payment->certification_payload ?? [];
-
-                $payment->artisan->update([
-                    'diplome' => $payload['diplome'] ?? null,
-                    'piece_identites' => $payload['piece_identites'] ?? null,
-                    'nom_association' => $payload['nom_association'] ?? null,
-                    'telephone_association' => $payload['telephone_association'] ?? null,
-                    'is_certifed' => false,
-                ]);
-
-                $payment->update([
-                    'statut' => 'paid',
-                    'paid_at' => now(),
-                ]);
-            });
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Paiement valide. Les informations de certification ont ete enregistrees.',
-                'data' => [
-                    'payment' => $payment->refresh(),
-                    'artisan' => $payment->artisan->refresh(),
-                ],
-            ]);
+            return $this->confirmFedapayCertificationPayment($payment);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -236,6 +190,97 @@ class ArtisanController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function fedapayWebhook(Request $request): JsonResponse
+    {
+        try {
+            $payload = $request->all();
+            $localReference = $this->firstScalarValue($payload, [
+                'custom_metadata.local_reference',
+                'transaction.custom_metadata.local_reference',
+                'data.custom_metadata.local_reference',
+                'data.transaction.custom_metadata.local_reference',
+                'entity.custom_metadata.local_reference',
+                'data.entity.custom_metadata.local_reference',
+            ]);
+            $transactionId = $this->extractFedapayTransactionId($payload);
+
+            if (! $localReference && ! $transactionId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Reference locale ou transaction Fedapay introuvable dans le webhook.',
+                ], 422);
+            }
+
+            $payment = PaymentModel::query()
+                ->where('type_evenement', 'certification_artisan')
+                ->when($localReference, fn (Builder $query) => $query->where('local_reference', $localReference))
+                ->when(! $localReference && $transactionId, fn (Builder $query) => $query->where('fedapay_transaction_id', $transactionId))
+                ->firstOrFail();
+
+            return $this->confirmFedapayCertificationPayment($payment, $transactionId);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors du traitement du webhook Fedapay.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function confirmFedapayCertificationPayment(PaymentModel $payment, ?string $transactionId = null): JsonResponse
+    {
+        $fedapayTransactionId = $transactionId ?: $payment->fedapay_transaction_id;
+        $transactionResponse = $this->fedapayRequest()->get($this->fedapayBaseUrl() . "/transactions/{$fedapayTransactionId}");
+
+        if ($transactionResponse->failed()) {
+            throw new Exception($transactionResponse->body());
+        }
+
+        $transaction = $transactionResponse->json();
+        $fedapayStatus = data_get($transaction, 'status') ?? data_get($transaction, 'transaction.status');
+        $status = $this->mapFedapayStatus($fedapayStatus);
+
+        if ($status !== 'paid') {
+            $payment->update(['statut' => $status]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Le paiement Fedapay n est pas encore valide.',
+                'data' => [
+                    'payment_status' => $status,
+                    'fedapay_status' => $fedapayStatus,
+                ],
+            ], 202);
+        }
+
+        DB::transaction(function () use ($payment, $fedapayTransactionId): void {
+            $payload = $payment->certification_payload ?? [];
+
+            $payment->artisan->update([
+                'diplome' => $payload['diplome'] ?? null,
+                'piece_identites' => $payload['piece_identites'] ?? null,
+                'nom_association' => $payload['nom_association'] ?? null,
+                'telephone_association' => $payload['telephone_association'] ?? null,
+                'is_certifed' => false,
+            ]);
+
+            $payment->update([
+                'fedapay_transaction_id' => $fedapayTransactionId,
+                'statut' => 'paid',
+                'paid_at' => now(),
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Paiement valide. Les informations de certification ont ete enregistrees.',
+            'data' => [
+                'payment' => $payment->refresh(),
+                'artisan' => $payment->artisan->refresh(),
+            ],
+        ]);
     }
 
     public function createposte(PostRequest $postrequest): JsonResponse

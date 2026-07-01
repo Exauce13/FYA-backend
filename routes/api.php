@@ -43,6 +43,7 @@ Route::get('/recherche-artisans', [UserController::class, 'rechercheArtisan']);
 Route::get('/posts/feed', [ArtisanController::class, 'feedPosts']);
 Route::get('/artisans/{artisan}/posts', [ArtisanController::class, 'artisanPosts']);
 Route::get('/artisans/{artisan}/avis', [ArtisanController::class, 'artisanAvis']);
+Route::post('/fedapay/webhook', [ArtisanController::class, 'fedapayWebhook'])->name('fedapay.webhook');
 Route::match(['get', 'post'], '/fedapay/certification/{reference}/callback', [ArtisanController::class, 'fedapayCertificationCallback'])->name('fedapay.certification.callback');
 
 Route::middleware('auth:sanctum')->group(function () {
