@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\MessagerieController;
 use App\Http\Controllers\Api\PlainteController;
 use App\Http\Controllers\Api\PresenceController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\ServiceController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -33,6 +34,10 @@ Route::middleware(['guest'])->group(function(){
     // Route utilisée pour alimenter les listes de métiers dans les formulaires (id + nom).
     Route::get('/metiers', [MetierController::class, 'listemetiers']);
 });
+
+Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
+Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
+
 Route::get('/{post}/commentaires', [CommentairesController::class, 'affichercommentaire']);
 Route::get('/recherche-artisans', [UserController::class, 'rechercheArtisan']);
 Route::get('/posts/feed', [ArtisanController::class, 'feedPosts']);

@@ -28,7 +28,7 @@ Cette documentation est basée uniquement sur le code présent dans ce dépôt.
 | Base de données | Configuration Laravel standard, migrations MySQL compatibles, SQLite présent en local |
 | Files d'attente | Configuration `database`, tables `jobs`, `job_batches`, `failed_jobs`; aucun Job applicatif dans `app/` |
 | Stockage fichiers | Disque `public` local vers `storage/app/public`, URL `/storage/...` |
-| Emails | Laravel Mail, `UserNotificationMail`, mailer par défaut `log` si non configuré |
+| Emails | Laravel Mail, `UserNotificationMail`, `ResetPasswordMail`, `PasswordChangedMail`, mailer par défaut `log` si non configuré |
 | Paiement externe | FedaPay pour la certification artisan |
 
 ## Architecture globale
@@ -124,6 +124,8 @@ Notes:
 | --- | --- | --- | --- | --- |
 | POST | `/api/register`, `/api/register/client`, `/api/register/artisan` | `UserController@register` | guest | Créer un utilisateur. |
 | POST | `/api/login` | `UserController@authenticate` | guest | Connexion Sanctum. |
+| POST | `/api/forgot-password` | `PasswordResetController@forgotPassword` | public | Demander un lien de réinitialisation sans révéler si l'email existe. |
+| POST | `/api/reset-password` | `PasswordResetController@resetPassword` | public | Réinitialiser le mot de passe via token email. |
 | GET | `/api/email/verify/{id}/{hash}` | `UserController@verifyEmail` | signed | Vérification email. |
 | POST | `/api/email/verification-notification` | `UserController@resendVerificationEmail` | guest | Renvoyer le lien email. |
 | GET | `/api/metiers` | `MetierController@listesmetiers` | guest | Liste des métiers; anomalie: la méthode définie est `listemetiers`. |
@@ -167,6 +169,52 @@ sequenceDiagram
     U->>DB: recherche user + vérification Hash
     U->>U: RateLimiter + email vérifié
     U-->>C: token Sanctum
+```
+
+#### Mot de passe oublié
+
+Le frontend utilise `/forget-password` pour demander un lien puis `/reset-password?token=...&email=...` pour saisir le nouveau mot de passe. Le backend expose deux endpoints publics:
+
+| Méthode | URI | Payload | Réponse |
+| --- | --- | --- | --- |
+| POST | `/api/forgot-password` | `email` | Message générique: `Si cette adresse existe, un lien de reinitialisation a ete envoye.` |
+| POST | `/api/reset-password` | `email`, `token`, `password`, `password_confirmation`, `confirm_password` optionnel | Message succès ou erreur de validation/token. |
+
+Sécurité appliquée:
+
+- La demande de lien ne révèle jamais si l'adresse existe.
+- Les demandes sont limitées à 5 par couple email/IP pendant 1 heure.
+- Un token aléatoire de 64 caractères est envoyé par email, mais seul son hash est stocké dans `password_reset_tokens`.
+- Un nouveau token invalide l'ancien token de la même adresse.
+- Le token expire après 60 minutes.
+- Le mot de passe doit respecter les mêmes règles que le frontend: 8 à 12 caractères, au moins une majuscule, une minuscule, un chiffre et un caractère spécial parmi `@$!%*?&_-#`.
+- Après réinitialisation, le token est supprimé, les tokens Sanctum existants de l'utilisateur sont invalidés et un email de notification est envoyé.
+- Le lien email est construit avec `FRONTEND_URL` puis `/reset-password?token=...&email=...`.
+
+```mermaid
+sequenceDiagram
+    participant C as Frontend
+    participant API as PasswordResetController
+    participant DB as password_reset_tokens
+    participant Mail as Mailer Laravel
+    participant U as users
+
+    C->>API: POST /api/forgot-password email
+    API->>API: validation + rate limit email/IP
+    API->>U: recherche utilisateur
+    alt utilisateur existe
+        API->>DB: supprimer ancien token
+        API->>DB: stocker hash du token
+        API->>Mail: ResetPasswordMail avec lien frontend
+    end
+    API-->>C: réponse générique
+
+    C->>API: POST /api/reset-password token/email/password
+    API->>DB: vérifier email + hash token + expiration 60 min
+    API->>U: mettre à jour mot de passe hashé
+    API->>DB: supprimer token + tokens Sanctum
+    API->>Mail: PasswordChangedMail
+    API-->>C: succès
 ```
 
 #### Appel d'offres et candidature
@@ -359,6 +407,15 @@ flowchart TD
 
 Méthodes privées: `loginThrottleKey` construit la clé email/IP; `loginLockedResponse` construit la réponse 429.
 
+#### `PasswordResetController`
+
+| Méthode | Objectif | Paramètres | Retour | Exceptions/erreurs | Dépendances et appels |
+| --- | --- | --- | --- | --- | --- |
+| `forgotPassword(Request $request)` | Générer et envoyer un lien de réinitialisation si l'email existe, sans énumération de comptes. | `email`. | JSON succès générique. | 422 validation, 429 trop de demandes. | `RateLimiter`, `User`, `Str::random`, `password_reset_tokens`, `Hash::make`, `ResetPasswordMail`. |
+| `resetPassword(Request $request)` | Vérifier le token et définir un nouveau mot de passe. | `email`, `token`, `password`, `password_confirmation`, `confirm_password` optionnel. | JSON succès. | 422 validation ou token invalide/expiré. | `Hash::check`, `DB::transaction`, cast `password=hashed`, suppression tokens Sanctum, `PasswordChangedMail`. |
+
+Méthodes privées: `forgotPasswordThrottleKey` construit la clé email/IP; `resetUrl` génère l'URL frontend; `tokenIsValid` vérifie hash et expiration.
+
 #### `ArtisanController`
 
 | Méthode | Objectif | Paramètres | Retour | Exceptions/erreurs | Dépendances et appels |
@@ -477,6 +534,12 @@ Méthodes privées: appartenance, formatage, normalisation média, promotion tem
 | `UserNotificationMail` | `__construct(NotificationModel $notification)` | Recevoir la notification à envoyer. | notification. | instance. | Aucune. | `NotificationModel`. |
 | `UserNotificationMail` | `envelope()` | Définir le sujet email selon le type. | aucun. | `Envelope`. | Aucune. | `subjectForType`. |
 | `UserNotificationMail` | `content()` | Définir la vue et les variables email. | aucun. | `Content`. | Aucune. | `emails.user-notification`, `bodyForNotification`. |
+| `ResetPasswordMail` | `__construct(User $user, string $resetUrl, int $expiresInMinutes)` | Préparer l'email contenant le lien frontend de réinitialisation. | utilisateur, URL, durée. | instance. | Aucune. | `User`. |
+| `ResetPasswordMail` | `envelope()` | Définir le sujet de réinitialisation. | aucun. | `Envelope`. | Aucune. | - |
+| `ResetPasswordMail` | `content()` | Définir la vue email et ses variables. | aucun. | `Content`. | Aucune. | `emails.reset-password`. |
+| `PasswordChangedMail` | `__construct(User $user)` | Préparer l'email de notification après changement du mot de passe. | utilisateur. | instance. | Aucune. | `User`. |
+| `PasswordChangedMail` | `envelope()` | Définir le sujet de notification. | aucun. | `Envelope`. | Aucune. | - |
+| `PasswordChangedMail` | `content()` | Définir la vue email et ses variables. | aucun. | `Content`. | Aucune. | `emails.password-changed`. |
 
 ### Events
 
@@ -543,6 +606,7 @@ Tous implémentent `ShouldBroadcastNow`; ils ne sont donc pas différés via un 
 | `APP_ENV=production` | Mode environnement de production. |
 | `APP_DEBUG=false` | Empêche l'affichage des erreurs détaillées. |
 | `APP_URL` | Base des URLs `Storage::url`. |
+| `FRONTEND_URL` | Base du lien envoyé par email pour `/reset-password?token=...&email=...`; retombe sur `APP_URL` si absent. |
 | `FILESYSTEM_DISK` | Disque par défaut Laravel; le code utilise explicitement `public`. |
 | `BROADCAST_CONNECTION` | Doit être `reverb` pour le temps réel. |
 | `REVERB_*` et `VITE_REVERB_*` | Configuration serveur/client Reverb. |
@@ -575,6 +639,7 @@ Le projet contient notamment:
 
 - `tests/Feature/MessagerieConversationTest.php`
 - `tests/Feature/LoginThrottleTest.php`
+- `tests/Feature/PasswordResetTest.php`
 - tests d'exemple Laravel.
 
 ## Éléments absents ou non implémentés
