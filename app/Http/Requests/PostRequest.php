@@ -36,7 +36,7 @@ class PostRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'description' => [ 'nullable', 'string', 'max:1000'],
+            'description' => [ 'nullable', 'string', 'max:10000'],
             'media_json' => ['nullable','array','max:10'],
             'media_json.*' => ['file','mimes:jpg,jpeg,png,webp,mp4,mov','max:51200'],
             'post_type' => ['required','in:realisations,services,promotion'],
